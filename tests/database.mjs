@@ -52,7 +52,7 @@ try {
   await cluster.start();
   client = cluster.getPgClient();
   await client.connect();
-  await client.query(`create role anon nologin;create role authenticated nologin;
+  await client.query(`create role anon nologin;create role authenticated nologin;create role service_role nologin;
  create schema auth;create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema public,auth to anon,authenticated;
@@ -60,7 +60,7 @@ try {
  create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;`);
   const migrationsDir = new URL("../supabase/migrations/", import.meta.url);
   for (const file of (await fs.readdir(migrationsDir))
-    .filter((f) => f.endsWith(".sql") && !f.startsWith("202611220016"))
+    .filter((f) => f.endsWith(".sql") && f < "202611220016")
     .sort()) {
     await client.query(await fs.readFile(new URL(file, migrationsDir), "utf8"));
   }
@@ -2388,7 +2388,7 @@ try {
       }
     },
   );
-  // Upgrade-path checkpoint: legacy receipt-engine tests above run on migration16.
+  // Upgrade-path checkpoint: legacy receipt-engine tests above run on migrations1–15.
   // Apply migration16 here, then test its final timing/ACL/cancellation rules below.
   await client.query(
     await fs.readFile(
@@ -2706,6 +2706,383 @@ try {
       );
     },
   );
+  await client.query(
+    await fs.readFile(
+      new URL("202611220017_staff_accounts.sql", migrationsDir),
+      "utf8",
+    ),
+  );
+  async function asService(sql, params = []) {
+    await client.query("begin");
+    try {
+      await client.query("set local role service_role");
+      const result = await client.query(sql, params);
+      await client.query("commit");
+      return result;
+    } catch (e) {
+      await client.query("rollback");
+      throw e;
+    }
+  }
+  const staffRequest = crypto.randomUUID(),
+    staffEmail = "test-created@example.invalid";
+  let staffJob;
+  await check(
+    "staff configuration is admin-only and profile/finisher grants stay narrow",
+    async () => {
+      await client.query(
+        "update public.settings set synthetic_test_enabled=true where id=true;update public.profiles set active=true where role='employee'",
+      );
+      assert.equal(
+        (await asUser(admin, "select public.get_staff_management_config() c"))
+          .rows[0].c.ready,
+        true,
+      );
+      await deny(
+        employee,
+        "select public.get_staff_management_config()",
+        [],
+        /not_authorized/,
+      );
+      await deny(
+        inactive,
+        "select public.begin_employee_account(gen_random_uuid(),'اختبار غير نشط','test-inactive@example.invalid')",
+        [],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "update public.profiles set role='admin' where id=$1",
+        [employee],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "delete from public.profiles where id=$1",
+        [employee],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "select public.complete_employee_account(gen_random_uuid(),$1)",
+        [admin],
+        /permission denied/,
+      );
+    },
+  );
+  await check(
+    "durable employee job chooses its own target and binds exact retries",
+    async () => {
+      staffJob = (
+        await asUser(
+          admin,
+          "select public.begin_employee_account($1,'اختبار موظف جديد',$2) j",
+          [staffRequest, staffEmail],
+        )
+      ).rows[0].j;
+      assert.equal(staffJob.actor_id, admin);
+      assert.equal(staffJob.status, "pending");
+      assert.notEqual(staffJob.user_id, admin);
+      assert.notEqual(staffJob.user_id, employee);
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.begin_employee_account($1,'اختبار موظف جديد',$2) j",
+            [staffRequest, staffEmail],
+          )
+        ).rows[0].j.id,
+        staffJob.id,
+      );
+      await deny(
+        admin,
+        "select public.begin_employee_account($1,'اختبار اسم مختلف',$2)",
+        [staffRequest, staffEmail],
+        /request_id_payload_mismatch/,
+      );
+      await deny(
+        admin,
+        "select public.begin_employee_account(gen_random_uuid(),'اختبار موظف جديد',$1)",
+        [staffEmail],
+        /employee_email_has_job/,
+      );
+      await deny(
+        employee,
+        "select public.begin_employee_account(gen_random_uuid(),'اختبار غير مسموح','test-denied@example.invalid')",
+        [],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "select public.begin_employee_account(gen_random_uuid(),'اختبار بريد خارجي','real@real.example')",
+        [],
+        /synthetic_employee_required/,
+      );
+      await deny(
+        admin,
+        "select public.begin_employee_account(gen_random_uuid(),'اسم حقيقي','test-real@example.invalid')",
+        [],
+        /synthetic_employee_required/,
+      );
+      assert.equal(
+        (await asUser(employee, "select * from public.employee_account_jobs"))
+          .rowCount,
+        0,
+      );
+      await deny(
+        admin,
+        "insert into public.employee_account_jobs(request_id,actor_id,full_name,email) values(gen_random_uuid(),$1,'اختبار كتابة','test-write@example.invalid')",
+        [admin],
+        /permission denied/,
+      );
+    },
+  );
+  await check(
+    "service completion needs the owned job, active actor and existing Auth target",
+    async () => {
+      await assert.rejects(
+        () =>
+          asService("select public.complete_employee_account($1,$2)", [
+            staffJob.id,
+            admin,
+          ]),
+        /auth_user_missing/,
+      );
+      await assert.rejects(
+        () =>
+          asService("select public.complete_employee_account($1,$2)", [
+            staffJob.id,
+            employee,
+          ]),
+        /active_admin_required/,
+      );
+      await client.query("insert into auth.users values($1)", [
+        staffJob.user_id,
+      ]);
+      assert.equal(
+        (
+          await asService("select public.complete_employee_account($1,$2) id", [
+            staffJob.id,
+            admin,
+          ])
+        ).rows[0].id,
+        staffJob.user_id,
+      );
+      assert.equal(
+        (
+          await asService("select public.complete_employee_account($1,$2) id", [
+            staffJob.id,
+            admin,
+          ])
+        ).rows[0].id,
+        staffJob.user_id,
+      );
+      const p = (
+        await client.query("select * from public.profiles where id=$1", [
+          staffJob.user_id,
+        ])
+      ).rows[0];
+      assert.equal(p.role, "employee");
+      assert.equal(p.active, true);
+      assert.equal(p.version, 1);
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select status from public.employee_account_jobs where id=$1",
+            [staffJob.id],
+          )
+        ).rows[0].status,
+        "completed",
+      );
+      assert.equal(
+        (await asUser(staffJob.user_id, "select public.is_staff() allowed"))
+          .rows[0].allowed,
+        true,
+      );
+    },
+  );
+  const editRequest = crypto.randomUUID();
+  await check(
+    "employee rename/deactivation is admin-only, versioned and cannot touch an admin",
+    async () => {
+      await deny(
+        employee,
+        "select public.update_employee_profile(gen_random_uuid(),$1,1,'اختبار تغيير',false,'سبب')",
+        [staffJob.user_id],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "select public.update_employee_profile(gen_random_uuid(),$1,1,'اختبار أدمن',false,'سبب')",
+        [admin],
+        /admin_profile_protected/,
+      );
+      await deny(
+        admin,
+        "select public.update_employee_profile(gen_random_uuid(),$1,1,'اسم غير مصطنع',false,'سبب')",
+        [staffJob.user_id],
+        /synthetic_employee_required/,
+      );
+      await deny(
+        admin,
+        "select public.update_employee_profile(gen_random_uuid(),$1,99,'اختبار تغيير',false,'سبب')",
+        [staffJob.user_id],
+        /stale_employee_version/,
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.update_employee_profile($1,$2,1,'اختبار موظف معدل',false,'اختبار تعطيل') v",
+            [editRequest, staffJob.user_id],
+          )
+        ).rows[0].v,
+        2,
+      );
+      assert.equal(
+        (await asUser(staffJob.user_id, "select public.is_staff() allowed"))
+          .rows[0].allowed,
+        false,
+      );
+      assert.equal(
+        (await asUser(staffJob.user_id, "select * from public.bookings"))
+          .rowCount,
+        0,
+      );
+      assert.equal(
+        (
+          await asUser(
+            staffJob.user_id,
+            "select * from public.employee_profile_changes",
+          )
+        ).rowCount,
+        0,
+      );
+      assert.equal(
+        (
+          await asUser(
+            staffJob.user_id,
+            "select * from public.employee_account_jobs",
+          )
+        ).rowCount,
+        0,
+      );
+      const h = (
+        await asUser(
+          admin,
+          "select * from public.employee_profile_changes where request_id=$1",
+          [editRequest],
+        )
+      ).rows[0];
+      assert.equal(h.actor_id, admin);
+      assert.equal(h.old_active, true);
+      assert.equal(h.new_active, false);
+      assert.equal(h.before_version, 1);
+      assert.equal(h.after_version, 2);
+      assert.equal(h.old_name, "اختبار موظف جديد");
+    },
+  );
+  await check(
+    "profile retries do not duplicate, stale requests fail and reactivation preserves identity",
+    async () => {
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.update_employee_profile($1,$2,1,'اختبار موظف معدل',false,'اختبار تعطيل') v",
+            [editRequest, staffJob.user_id],
+          )
+        ).rows[0].v,
+        2,
+      );
+      await deny(
+        admin,
+        "select public.update_employee_profile($1,$2,1,'اختبار موظف معدل',true,'اختبار تعطيل')",
+        [editRequest, staffJob.user_id],
+        /request_id_payload_mismatch/,
+      );
+      await deny(
+        admin,
+        "select public.update_employee_profile(gen_random_uuid(),$1,1,'اختبار موظف معدل',true,'اختبار تفعيل')",
+        [staffJob.user_id],
+        /stale_employee_version/,
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.update_employee_profile(gen_random_uuid(),$1,2,'اختبار موظف معدل',true,'اختبار تفعيل') v",
+            [staffJob.user_id],
+          )
+        ).rows[0].v,
+        3,
+      );
+      assert.equal(
+        (await asUser(staffJob.user_id, "select public.is_staff() allowed"))
+          .rows[0].allowed,
+        true,
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select count(*) n from public.employee_profile_changes where employee_id=$1",
+            [staffJob.user_id],
+          )
+        ).rows[0].n,
+        "2",
+      );
+      assert.equal(
+        (
+          await client.query("select count(*) n from auth.users where id=$1", [
+            staffJob.user_id,
+          ])
+        ).rows[0].n,
+        "1",
+      );
+      await deny(
+        admin,
+        "delete from public.employee_profile_changes where employee_id=$1",
+        [staffJob.user_id],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "update public.employee_account_jobs set status='pending' where id=$1",
+        [staffJob.id],
+        /permission denied/,
+      );
+    },
+  );
+  await check(
+    "staff jobs and edits fail closed outside synthetic mode",
+    async () => {
+      await client.query(
+        "update public.settings set synthetic_test_enabled=false where id=true",
+      );
+      await deny(
+        admin,
+        "select public.begin_employee_account(gen_random_uuid(),'اختبار بوابة','test-gate@example.invalid')",
+        [],
+        /functional_portfolio_required/,
+      );
+      await deny(
+        admin,
+        "select public.update_employee_profile(gen_random_uuid(),$1,3,'اختبار موظف معدل',false,'اختبار بوابة')",
+        [staffJob.user_id],
+        /functional_portfolio_required/,
+      );
+      await assert.rejects(
+        () =>
+          asService("select public.complete_employee_account($1,$2)", [
+            staffJob.id,
+            admin,
+          ]),
+        /functional_portfolio_required/,
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,
@@ -2716,7 +3093,7 @@ try {
     );
   });
   await check(
-    "fresh database applies all16 migrations and enforces the corrected final receipt/cancellation boundary",
+    "fresh database applies all17 migrations and enforces the corrected final receipt/cancellation boundary",
     async () => {
       await client.query("create database atelier_fresh");
       const previous = client;
@@ -2758,6 +3135,18 @@ try {
         ).rows[0].c;
         assert.equal(cfg.receipt_timing_ready, true);
         assert.equal(cfg.cancellation_ready, true);
+        assert.equal(
+          (await asUser(admin, "select public.get_staff_management_config() c"))
+            .rows[0].c.ready,
+          true,
+        );
+        await deny(
+          admin,
+          "select public.complete_employee_account(gen_random_uuid(),$1)",
+          [admin],
+          /permission denied/,
+        );
+
         const b = (
           await asUser(
             admin,

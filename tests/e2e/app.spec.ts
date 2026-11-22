@@ -874,3 +874,68 @@ test("booking form retains staff input when the browser requests a post-action r
   );
   await expect(page.locator('[name="deposit_confirm"]')).toBeChecked();
 });
+
+test("team preview protects admin role, labels synthetic creation and preserves rejected form values", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/team");
+  await expect(
+    page.getByRole("heading", { name: "الفريق والصلاحيات", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "إنشاء حساب موظف", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "حفظ اسم وحالة الموظف", exact: true }),
+  ).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: "تحقق وأكمل الربط فقط" }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("معرف البريد التجريبي", { exact: true })
+    .fill("test-browser@example.invalid");
+  expect(
+    await page
+      .getByLabel("معرف البريد التجريبي", { exact: true })
+      .evaluate((e: HTMLInputElement) => e.checkValidity()),
+  ).toBeTruthy();
+  await page
+    .getByLabel("معرف البريد التجريبي", { exact: true })
+    .fill("real@example.com");
+  expect(
+    await page
+      .getByLabel("معرف البريد التجريبي", { exact: true })
+      .evaluate((e: HTMLInputElement) => e.checkValidity()),
+  ).toBeFalsy();
+  await page
+    .getByLabel("معرف البريد التجريبي", { exact: true })
+    .fill("test-browser@example.invalid");
+  await page
+    .getByLabel("اسم تجريبي", { exact: true })
+    .fill("اختبار اسم يحتفظ به النموذج");
+  await page
+    .getByLabel("كلمة مرور للحساب التجريبي", { exact: false })
+    .fill("fixture-not-a-real-secret");
+  await page
+    .locator('input[name="email"]')
+    .evaluate((e: HTMLInputElement) => e.form!.reset());
+  await expect(page.getByLabel("اسم تجريبي", { exact: true })).toHaveValue(
+    "اختبار اسم يحتفظ به النموذج",
+  );
+  await expect(
+    page.getByLabel("معرف البريد التجريبي", { exact: true }),
+  ).toHaveValue("test-browser@example.invalid");
+  await page.getByLabel("كلمة مرور للحساب التجريبي", { exact: false }).fill("");
+  await page.screenshot({ path: "evidence/team-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "evidence/team-mobile.png", fullPage: true });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  expect(errors).toEqual([]);
+});

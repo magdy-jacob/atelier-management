@@ -1,14 +1,14 @@
-# Verification record, 0.17.1
+# Verification record, 0.18.0
 
 Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
 
 ## Current passed checks
 
 - ESLint and TypeScript: pass.
-- 34 unit tests: pass.
-- 163 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
+- 48 unit tests: pass.
+- 191 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
 - Optimized Next.js builds with functional portfolio flag off and on: pass.
-- 19 Chrome browser scenarios in the flag-on build: pass. The default build's existing 16 scenarios and new portfolio scenario were also checked.
+- 20 Chrome browser scenarios in each optimized flag-off/flag-on build: pass.
 - npm audit with production dependencies: zero reported vulnerabilities at this checkpoint. An audit is not a security guarantee.
 
 ## Functional synthetic mode coverage
@@ -145,3 +145,13 @@ Actual desktop/mobile pixels of cancellation and the physical-return receipt for
 ## Input retention correction 0.17.1
 
 The booking form cancels native form reset events. Successful booking navigates away; rejected actions no longer clear uncontrolled staff fields merely because the Server Action returned an error object. A browser test requests the same native reset and verifies selected dress, test identity/contact, dates, method and confirmation stay intact. Actual hosted rejected-action feedback remains independently verifiable; the local test does not pretend to be a hosted Supabase rejection.
+
+## Employee management 0.18.0
+
+48 unit tests,191 local PostgreSQL checks and20 Chrome scenarios pass, plus lint/typecheck and optimized builds. The DB suite applies migrations1–15 for legacy engine checks, then16 for final receipt/cancellation checks, then17 for staff checks. A separate fresh installation applies all17 and denies the ordinary admin access to the service-only finisher. Vendor-owned Auth/Storage schemas are stubs, not a real GoTrue service.
+
+New checks cover fixed server-chosen Auth targets; exact job retry/payload binding; synthetic identities; admin-only jobs/profile writes; service-only completion; missing Auth parents and active-actor checks; immutable employee role/admin protection; stale edits; rename/deactivation/history; reactivation without replacement; inactive RLS denial; closed synthetic gate. Injected-port tests cover unknown reads, lost create replies, strict ID/email/private-metadata binding, no adoption or cleanup, completed-account absence, read-only recovery, unchanged existing password and uncertain profile completion. Password length checks use UTF-8 bytes, not only JavaScript character length.
+
+The browser test checks real HTML email validation, protected admin row, disabled non-saving preview controls, retained form values after native reset, desktop/mobile layout and no overflow. Actual pixels in `evidence/team-desktop.png` and `evidence/team-mobile.png` were inspected. No actual account/password/key was created or used during these local tests. Secret environment references are server-only. The source does not send invitation or confirmation email.
+
+Hosted acceptance still needs a disposable synthetic Auth creation, actual sign-in, correct employee scope, admin-only operations, name change, deactivation blocking an existing employee session, reactivation, retry/recovery feedback and original review-data preservation. Verify email_confirm/private app_metadata/fixed-ID behavior against the real project. Do not delete a live Auth account on an uncertain response. No password reset or role promotion is shipped, and full MVP completion is not claimed.

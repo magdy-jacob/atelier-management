@@ -583,6 +583,78 @@ try {
       );
     },
   );
+  await deny(
+    employee,
+    "select public.admin_dashboard('2026-01-01','2026-01-01')",
+    [],
+    /not_authorized/,
+  );
+  await deny(
+    admin,
+    "select public.admin_dashboard('2026-01-01','2027-01-02')",
+    [],
+    /invalid_reporting_period/,
+  );
+  await check(
+    "admin summary aggregates actual current receipts without exposing it to anon",
+    async () => {
+      const d = (
+        await asUser(
+          admin,
+          "select public.admin_dashboard((now() at time zone 'Africa/Cairo')::date,(now() at time zone 'Africa/Cairo')::date) as d",
+        )
+      ).rows[0].d;
+      const expected = (
+        await client.query(
+          "select coalesce(sum(amount_piasters),0)::text total,count(*)::int n from public.payments",
+        )
+      ).rows[0];
+      assert.equal(d.receipt_piasters, expected.total);
+      assert.equal(d.receipt_count, expected.n);
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.admin_dashboard(date,date)','EXECUTE') as allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+    },
+  );
+  await check(
+    "admin receipt period uses Cairo midnight rather than UTC midnight",
+    async () => {
+      const rows = (
+        await client.query(
+          "select id,amount_piasters::text amount from public.payments order by id limit 2",
+        )
+      ).rows;
+      await client.query(
+        "update public.payments set recorded_at='2026-01-01T21:59:59Z' where id=$1",
+        [rows[0].id],
+      );
+      await client.query(
+        "update public.payments set recorded_at='2026-01-01T22:00:00Z' where id=$1",
+        [rows[1].id],
+      );
+      const first = (
+        await asUser(
+          admin,
+          "select public.admin_dashboard('2026-01-01','2026-01-01') as d",
+        )
+      ).rows[0].d;
+      const second = (
+        await asUser(
+          admin,
+          "select public.admin_dashboard('2026-01-02','2026-01-02') as d",
+        )
+      ).rows[0].d;
+      assert.equal(first.receipt_count, 1);
+      assert.equal(second.receipt_count, 1);
+      assert.equal(first.receipt_piasters, rows[0].amount);
+      assert.equal(second.receipt_piasters, rows[1].amount);
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,

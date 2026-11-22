@@ -262,3 +262,36 @@ test("Cairo-day operations calendar distinguishes return alerts and planned prep
   await page.goto("/workspace/operations");
   await expect(page).toHaveURL(/login/);
 });
+
+test("admin summary has explicit money definitions and remains protected", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/admin");
+  await expect(
+    page.getByRole("heading", { name: "لوحة الأدمن" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "الصورة المالية المسجلة" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("مبالغ مستلمة مسجلة في الفترة", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "evidence/admin-dashboard-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/admin");
+  await page.screenshot({
+    path: "evidence/admin-dashboard-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/workspace/dashboard");
+  await expect(page).toHaveURL(/login/);
+});

@@ -72,9 +72,9 @@ export default async function Workspace({
           {profile.role === "admin" && (
             <Link
               className="rounded-full border bg-white px-4 py-2"
-              href="/workspace/customers"
+              href="/workspace/dashboard"
             >
-              العملاء وسجل الحجوزات
+              لوحة الأدمن المالية والتشغيلية
             </Link>
           )}
           {profile.role === "admin" && (

@@ -25,6 +25,7 @@ export function StaffFrame({
     ["/workspace/operations", "العمليات والتقويم"],
     ...(role === "admin"
       ? [
+          ["/workspace/dashboard", "لوحة الأدمن"],
           ["/workspace/customers", "العملاء"],
           ["/workspace/activity", "سجل النشاط"],
           ["/workspace/team", "الفريق"],

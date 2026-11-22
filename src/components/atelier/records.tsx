@@ -144,7 +144,7 @@ export function BookingList({
 export type LedgerRow = {
   id: string;
   amount_piasters: number;
-  method: string;
+  method: string | null;
   kind: string;
   recorded_at: string;
 };
@@ -183,7 +183,8 @@ export function BookingLedger({
             >
               <div className="space-y-2">
                 <p>
-                  {p.kind === "deposit" ? "مقدم" : "دفعة"} · {p.method}
+                  {p.kind === "deposit" ? "مقدم" : "دفعة"} ·{" "}
+                  {p.method ?? "لم تسجل طريقة"}
                 </p>
                 <time
                   dateTime={p.recorded_at}

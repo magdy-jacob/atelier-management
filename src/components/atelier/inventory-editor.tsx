@@ -77,6 +77,7 @@ export function InventoryEditor({
           </Badge>
         </div>
         <form
+          key={`edit-${dress.version}`}
           action={preview || readOnly ? undefined : editAction}
           onSubmit={preview || readOnly ? (e) => e.preventDefault() : undefined}
           className="space-y-5"
@@ -169,6 +170,7 @@ export function InventoryEditor({
               برابطها المباشر.
             </p>
             <form
+              key={`archive-${dress.version}`}
               action={preview ? undefined : archiveAction}
               onSubmit={preview ? (e) => e.preventDefault() : undefined}
               className="space-y-4"

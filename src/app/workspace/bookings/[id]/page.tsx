@@ -1,3 +1,5 @@
+import { getBookingConfig, bookingConfigReady } from "@/lib/booking-config";
+import { LivePaymentForm } from "@/components/atelier/live-booking-forms";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -36,6 +38,7 @@ export default async function BookingDetails({
       .select("id,amount_piasters,reason")
       .eq("booking_id", id),
   ]);
+  const config = await getBookingConfig(db);
   const dress = Array.isArray(b.dresses) ? b.dresses[0] : b.dresses;
   const customer = Array.isArray(b.customers) ? b.customers[0] : b.customers;
   return (
@@ -107,10 +110,22 @@ export default async function BookingDetails({
           )}
         </>
       )}
+      {!paymentError && !feeError && (
+        <LivePaymentForm
+          bookingId={b.id}
+          requestId={crypto.randomUUID()}
+          methods={config?.payment_methods ?? []}
+          enabled={
+            !!(
+              bookingConfigReady(config) &&
+              ["confirmed", "out"].includes(b.status)
+            )
+          }
+        />
+      )}
       <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-xs leading-7">
-        التنبيه الزمني بالخروج أو العودة أو التأخير يحتاج منطقة زمنية معتمدة
-        للفرع. لا نفترضها من مكان حساب المستخدم، ولا نغيّر حالة الحجز تلقائيًا
-        هنا.
+        العمليات والتقويم يستخدمان أيام مصر. الحالة المسجلة هنا لا تتغير تلقائيًا
+        مع مرور الموعد؛ يلزم إجراء تسليم أو عودة معتمد.
       </p>
     </StaffFrame>
   );

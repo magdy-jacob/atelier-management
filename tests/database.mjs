@@ -186,6 +186,33 @@ try {
       [request, dress],
     )
   ).rows[0].id;
+  await check(
+    "staff form config exposes only safe confirmed settings",
+    async () => {
+      const c = (
+        await asUser(employee, "select public.get_staff_booking_config() as c")
+      ).rows[0].c;
+      assert.equal(c.date_precision, "day");
+      assert.equal(c.payment_method_optional, true);
+      assert.equal(c.same_day_allowed, false);
+      assert.equal(c.business_timezone, "Africa/Cairo");
+      assert.equal("password" in c, false);
+    },
+  );
+  await check(
+    "next available day includes return and preparation days",
+    async () =>
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select public.next_available_day($1,'2099-12-06',0)::text as d",
+            [dress],
+          )
+        ).rows[0].d,
+        "2099-12-08",
+      ),
+  );
   await check("booking and deposit stored atomically", async () => {
     assert.equal(
       (
@@ -217,6 +244,18 @@ try {
         1,
       );
     },
+  );
+  await deny(
+    employee,
+    "select public.create_booking($1,$2,'Test customer','01000000000','2099-12-05','2099-12-06',400000,100000,'cash')",
+    [request, dress],
+    /request_id_payload_mismatch/,
+  );
+  await deny(
+    employee,
+    "select public.create_booking(gen_random_uuid(),$1,'Same day','01000000000',(now() at time zone 'Africa/Cairo')::date,(now() at time zone 'Africa/Cairo')::date,300000,0,null)",
+    [dress],
+    /invalid_dates_or_same_day_policy/,
   );
   await deny(
     employee,
@@ -274,9 +313,9 @@ try {
   );
   await deny(
     employee,
-    "select public.record_payment(gen_random_uuid(),$1,200000,'unapproved')",
+    "select public.record_payment(gen_random_uuid(),$1,200000,repeat('x',41))",
     [booking],
-    /policy_decisions_pending/,
+    /invalid_payment_method/,
   );
   await check("remaining payment exact integer piasters", async () => {
     await asUser(
@@ -294,6 +333,41 @@ try {
       300000,
     );
   });
+  await check(
+    "exact payment retry returns prior payment without duplication",
+    async () => {
+      const p = (
+        await asUser(
+          employee,
+          "select id,request_id from public.payments where booking_id=$1 and kind='payment'",
+          [booking],
+        )
+      ).rows[0];
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select public.record_payment($1,$2,200000,'cash') as id",
+            [p.request_id, booking],
+          )
+        ).rows[0].id,
+        p.id,
+      );
+    },
+  );
+  const previousPayment = (
+    await asUser(
+      employee,
+      "select request_id from public.payments where booking_id=$1 and kind='payment'",
+      [booking],
+    )
+  ).rows[0].request_id;
+  await deny(
+    employee,
+    "select public.record_payment($1,$2,199999,'cash')",
+    [previousPayment, booking],
+    /request_id_payload_mismatch/,
+  );
   await deny(
     employee,
     "delete from public.payments where booking_id=$1",
@@ -455,6 +529,57 @@ try {
           )
         ).rowCount,
         1,
+      );
+    },
+  );
+  await check(
+    "optional deposit method is stored as null without inventing a method",
+    async () => {
+      const r = await asUser(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'Optional method','01000000009','2101-02-10','2101-02-11',50000,10000,null) as id",
+        [dress],
+      );
+      const id = r.rows[0].id;
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select method from public.payments where booking_id=$1",
+            [id],
+          )
+        ).rows[0].method,
+        null,
+      );
+      await asUser(
+        employee,
+        "select public.record_payment(gen_random_uuid(),$1,10000,'   ')",
+        [id],
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select count(*)::int n from public.payments where booking_id=$1 and method is null",
+            [id],
+          )
+        ).rows[0].n,
+        2,
+      );
+      await asUser(
+        employee,
+        "select public.record_payment(gen_random_uuid(),$1,10000,'Another received-money method')",
+        [id],
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select count(*)::int n from public.payments where booking_id=$1",
+            [id],
+          )
+        ).rows[0].n,
+        3,
       );
     },
   );

@@ -180,3 +180,17 @@ export function toPiasters(value: string): number {
   const [pounds, cents = ""] = value.split(".");
   return Number(pounds) * 100 + Number(cents.padEnd(2, "0"));
 }
+
+export function dateInZone(instant: Date | string, zone: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(typeof instant === "string" ? new Date(instant) : instant)
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}

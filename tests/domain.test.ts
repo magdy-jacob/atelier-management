@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   addDays,
+  dateInZone,
   validDay,
   overlaps,
   firstAvailable,
@@ -57,3 +58,22 @@ test("money stored in integer piasters, no float rounding", () => {
 });
 test("fixed demo day is Saturday", () =>
   assert.equal(new Date("2026-12-05T12:00:00Z").getUTCDay(), 6));
+
+test("Egypt day boundaries respect winter and summer offset changes", () => {
+  assert.equal(
+    dateInZone("2026-01-01T21:30:00Z", "Africa/Cairo"),
+    "2026-01-01",
+  );
+  assert.equal(
+    dateInZone("2026-01-01T22:30:00Z", "Africa/Cairo"),
+    "2026-01-02",
+  );
+  assert.equal(
+    dateInZone("2026-07-01T20:30:00Z", "Africa/Cairo"),
+    "2026-07-01",
+  );
+  assert.equal(
+    dateInZone("2026-07-01T21:30:00Z", "Africa/Cairo"),
+    "2026-07-02",
+  );
+});

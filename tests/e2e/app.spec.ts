@@ -176,3 +176,89 @@ test("read-only records render on desktop/mobile; protected routes stay closed",
   await page.goto("/workspace/customers");
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test("real booking/payment form preview calculates balance but cannot submit", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/booking");
+  await expect(
+    page.getByRole("heading", { name: "نماذج الحجز والدفعات" }),
+  ).toBeVisible();
+  await page.getByLabel("السعر النهائي المتفق عليه (جنيه)").fill("3000");
+  await page.getByLabel("المقدم المستلم (جنيه)").fill("1000");
+  await expect(page.locator("output")).toContainText("٢");
+  await expect(
+    page.getByRole("button", { name: "الحفظ الفعلي غير مفعل" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "تسجيل الدفعة في السجل" }),
+  ).toBeDisabled();
+  await page.screenshot({
+    path: "evidence/booking-form-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/booking");
+  await page.getByLabel("السعر النهائي المتفق عليه (جنيه)").fill("3000");
+  await page.getByLabel("المقدم المستلم (جنيه)").fill("1000");
+  await expect(
+    page.getByLabel("طريقة استلام المقدم (اختياري)"),
+  ).not.toHaveAttribute("required");
+  await page.getByLabel("طريقة استلام المقدم (اختياري)").fill("طريقة أخرى");
+  await page.getByLabel("طريقة استلام المقدم (اختياري)").fill("");
+  await page.screenshot({
+    path: "evidence/booking-form-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  expect(errors).toEqual([]);
+});
+
+test("Cairo-day operations calendar distinguishes return alerts and planned preparation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/operations");
+  await expect(
+    page.getByRole("heading", { name: "العمليات والتقويم" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "عودة مطلوبة اليوم (١)" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "متأخر عن العودة المسجلة (١)" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /تقويم ديسمبر/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("تجهيز مخطط", { exact: true }).first(),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "evidence/operations-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "evidence/operations-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.getByRole("link", { name: "الشهر التالي" }).click();
+  await expect(
+    page.getByRole("heading", { name: /تقويم يناير/ }),
+  ).toBeVisible();
+  await page.goto("/workspace/operations");
+  await expect(page).toHaveURL(/login/);
+});

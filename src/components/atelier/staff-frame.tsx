@@ -21,6 +21,8 @@ export function StaffFrame({
 }) {
   const links = [
     ["/workspace", "نظرة عامة"],
+    ["/workspace/bookings", "الحجوزات"],
+    ["/workspace/operations", "العمليات والتقويم"],
     ...(role === "admin"
       ? [
           ["/workspace/customers", "العملاء"],

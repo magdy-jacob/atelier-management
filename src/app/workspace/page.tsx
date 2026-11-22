@@ -93,6 +93,24 @@ export default async function Workspace({
               </Link>
             </>
           )}
+          <Link
+            href="/workspace/operations"
+            className="rounded-full border bg-white px-4 py-2"
+          >
+            العمليات والتقويم
+          </Link>
+          <Link
+            href="/workspace/bookings"
+            className="rounded-full border bg-white px-4 py-2"
+          >
+            كل الحجوزات
+          </Link>
+          <Link
+            href="/workspace/bookings/new"
+            className="rounded-full border bg-primary px-4 py-2 text-white"
+          >
+            حجز جديد
+          </Link>
         </nav>
         <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-xs leading-7">
           يتاح للأدمن إضافة الفساتين وتحريرها وأرشفتها ورفع صورها. التشغيل

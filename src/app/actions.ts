@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { configured, supabaseServer } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/supabase/auth";
-export type ActionState = { error?: string; success?: string };
+export type ActionState = {
+  error?: string;
+  success?: string;
+  nextRequestId?: string;
+};
 export async function signIn(
   _previous: ActionState,
   form: FormData,
@@ -238,4 +242,174 @@ export async function uploadDressImage(
   revalidatePath(`/workspace/dresses/${id.data}`);
   revalidatePath(`/dresses/${id.data}`);
   return { success: "تم رفع الصورة بعد ضغطها وإزالة بياناتها الوصفية." };
+}
+
+export async function createRealBooking(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db } = await requireStaff();
+  const parsed = z
+    .object({
+      request_id: z.uuid(),
+      dress_id: z.uuid(),
+      customer: z.string().trim().min(1).max(120),
+      phone: z
+        .string()
+        .trim()
+        .min(5)
+        .max(24)
+        .regex(/^[+0-9 ()-]+$/)
+        .refine((v) => v.replace(/\D/g, "").length >= 5),
+      starts_on: z.string(),
+      returns_on: z.string(),
+      method: z.string().trim().max(40).default(""),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return { error: "راجع الاسم والهاتف والفستان وباقي الحقول." };
+  const { validDay, toPiasters, formatDay } = await import("@/lib/domain");
+  if (
+    !validDay(parsed.data.starts_on) ||
+    !validDay(parsed.data.returns_on) ||
+    parsed.data.returns_on < parsed.data.starts_on
+  )
+    return { error: "راجع تاريخ الخروج والعودة." };
+  let total: number, deposit: number;
+  try {
+    total = toPiasters(String(form.get("total")));
+    deposit = toPiasters(String(form.get("deposit")));
+  } catch {
+    return { error: "اكتب مبالغ صحيحة بحد أقصى خانتين عشريتين." };
+  }
+  if (total <= 0 || deposit > total)
+    return { error: "السعر أكبر من صفر، والمقدم لا يتجاوز السعر." };
+  if (deposit > 0 && form.get("deposit_confirm") !== "on")
+    return { error: "أكّد استلام المقدم فعليًا قبل تسجيله." };
+  const d = parsed.data;
+  const { data, error } = await db.rpc("create_booking", {
+    p_request_id: d.request_id,
+    p_dress_id: d.dress_id,
+    p_customer_name: d.customer,
+    p_phone: d.phone,
+    p_start: d.starts_on,
+    p_return: d.returns_on,
+    p_total: total,
+    p_deposit: deposit,
+    p_method: deposit > 0 ? d.method || null : null,
+  });
+  if (error) {
+    if (error.code === "23P01" || error.message.includes("no_dress_overlap")) {
+      const duration = Math.round(
+        (Date.parse(d.returns_on) - Date.parse(d.starts_on)) / 86400000,
+      );
+      const next = await db.rpc("next_available_day", {
+        p_dress_id: d.dress_id,
+        p_start: d.starts_on,
+        p_duration: duration,
+      });
+      return {
+        error:
+          typeof next.data === "string" && !next.error
+            ? `التاريخ متعارض مع حجز أو فترة التجهيز. أول بداية مقترحة: ${formatDay(next.data)}. الاقتراح ليس تأكيد حجز.`
+            : "التاريخ متعارض مع حجز أو فترة التجهيز. راجع موعدًا آخر.",
+      };
+    }
+    if (error.message.includes("request_id_payload_mismatch"))
+      return {
+        error:
+          "هذا الطلب حُفظ من قبل بقيم مختلفة. راجع سجل الحجز قبل إنشاء طلب جديد.",
+      };
+    if (error.message.includes("policy_decisions_pending"))
+      return {
+        error: "الحجوزات الفعلية متوقفة لحين اعتماد الإعدادات والسياسات.",
+      };
+    if (
+      error.message.includes("same_day") ||
+      error.message.includes("invalid_dates")
+    )
+      return {
+        error:
+          "التاريخ غير مسموح وفق إعدادات اليوم الحالي والحجز في نفس اليوم.",
+      };
+    if (error.message.includes("payment_method"))
+      return { error: "وصف الطريقة الاختياري لا يتجاوز ٤٠ حرفًا." };
+    if (error.message.includes("operationally"))
+      return { error: "الفستان غير متاح تشغيليًا. راجع حالته مع الأدمن." };
+    return {
+      error:
+        "تعذر تأكيد الحفظ. لا تنشئ طلبًا جديدًا فورًا؛ أعد نفس المحاولة للتأكد دون تكرار بفضل معرف الطلب.",
+    };
+  }
+  const id = z.uuid().safeParse(data);
+  if (!id.success)
+    return {
+      error:
+        "تعذر التحقق من نتيجة الحفظ. راجع قائمة الحجوزات قبل أي محاولة جديدة.",
+    };
+  revalidatePath("/workspace");
+  revalidatePath("/workspace/bookings");
+  revalidatePath("/workspace/customers");
+  redirect(`/workspace/bookings/${id.data}`);
+}
+export async function recordRealPayment(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db } = await requireStaff();
+  const parsed = z
+    .object({
+      request_id: z.uuid(),
+      booking_id: z.uuid(),
+      method: z.string().trim().max(40).default(""),
+      confirm: z.literal("on"),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return {
+      error: "أكّد استلام المبلغ فعليًا، ووصف الطريقة اختياري حتى ٤٠ حرفًا.",
+    };
+  const { toPiasters } = await import("@/lib/domain");
+  let amount: number;
+  try {
+    amount = toPiasters(String(form.get("amount")));
+  } catch {
+    return { error: "أدخل مبلغًا صحيحًا بحد أقصى خانتين عشريتين." };
+  }
+  if (amount <= 0) return { error: "المبلغ يجب أن يكون أكبر من صفر." };
+  const d = parsed.data;
+  const { error } = await db.rpc("record_payment", {
+    p_request_id: d.request_id,
+    p_booking_id: d.booking_id,
+    p_amount: amount,
+    p_method: d.method || null,
+  });
+  if (error) {
+    if (
+      error.message.includes("overpayment") ||
+      error.message.includes("invalid_amount")
+    )
+      return {
+        error: "المبلغ يتجاوز المستحق أو غير صحيح. راجع أحدث رصيد قبل التسجيل.",
+      };
+    if (error.message.includes("request_id_payload_mismatch"))
+      return {
+        error:
+          "هذا الطلب حُفظ من قبل بقيم مختلفة. راجع سجل الحجز قبل إنشاء طلب جديد.",
+      };
+    if (error.message.includes("policy_decisions_pending"))
+      return { error: "التسجيل الفعلي لم يُفعّل بعد اكتمال اختبارات الربط." };
+    if (error.code === "42501")
+      return { error: "غير مسموح بتسجيل دفعة لهذا الحجز." };
+    return {
+      error:
+        "لم نتمكن من تأكيد النتيجة. أعد نفس المحاولة بمعرف الطلب الحالي، ولا تضف دفعة أخرى قبل مراجعة السجل.",
+    };
+  }
+  revalidatePath(`/workspace/bookings/${d.booking_id}`);
+  revalidatePath("/workspace");
+  return {
+    success: "تم تسجيل الدفعة المستلمة في السجل، دون تحصيل إلكتروني.",
+    nextRequestId: crypto.randomUUID(),
+  };
 }

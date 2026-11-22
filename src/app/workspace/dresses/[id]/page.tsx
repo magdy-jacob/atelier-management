@@ -59,7 +59,7 @@ export default async function ManageDress({
             : "بيانات الفستان. التعديل ورفع الصور للأدمن فقط."}
         </p>
         <InventoryEditor
-          key={dress.version}
+          key={dress.id}
           dress={dress}
           categories={categories ?? []}
           images={images}

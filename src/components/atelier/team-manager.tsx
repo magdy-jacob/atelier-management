@@ -382,12 +382,7 @@ export function TeamManager({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <h3 className="text-sm">{p.full_name}</h3>
-                <p
-                  dir="ltr"
-                  className="mt-2 break-all font-mono text-[10px] text-muted-foreground"
-                >
-                  {p.id}
-                </p>
+
               </div>
               <div className="flex gap-2">
                 <Badge variant="outline">

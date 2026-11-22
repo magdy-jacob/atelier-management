@@ -362,6 +362,11 @@ export async function createRealBooking(
       };
     if (error.message.includes("payment_method"))
       return { error: "وصف الطريقة الاختياري لا يتجاوز ٤٠ حرفًا." };
+    if (error.message.includes("dress_in_maintenance"))
+      return {
+        error:
+          "الفستان في الصيانة. لا حجز جديد حتى يؤكد الأدمن انتهاءها ويعيد الجاهزية.",
+      };
     if (error.message.includes("operationally"))
       return { error: "الفستان غير متاح تشغيليًا. راجع حالته مع الأدمن." };
     return {
@@ -631,6 +636,8 @@ function refreshWorkflow(bookingId: string) {
     revalidatePath(path);
 }
 function workflowError(message: string) {
+  if (message.includes("maintenance_admin_clear_required"))
+    return "الفستان يحتاج صيانة. الأدمن وحده يؤكد انتهاءها ويعيده جاهزًا، ولا يتجاوز التسليم هذا الشرط.";
   if (message.includes("outstanding_balance_before_return"))
     return "لا يمكن إتمام العودة قبل سداد المتبقي كله، شامل أي غرامة مسجلة. سجل الدفعة المستلمة أولًا ثم أعد المحاولة.";
   if (message.includes("deposit_required"))

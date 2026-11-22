@@ -17,6 +17,8 @@ const schema = z.object({
   handover_return_ready: z.boolean().default(false),
   receipt_timing_ready: z.boolean().default(false),
   cancellation_ready: z.boolean().default(false),
+  booking_edit_ready: z.boolean().default(false),
+  maintenance_admin_ready: z.boolean().default(false),
 });
 export type BookingConfig = z.infer<typeof schema>;
 export async function getBookingConfig(

@@ -316,6 +316,7 @@ export function BookingWorkflow({
   remaining,
   data,
   enabled,
+  admin = false,
   preview = false,
 }: {
   bookingId: string;
@@ -327,9 +328,12 @@ export function BookingWorkflow({
   remaining: string;
   data: WorkflowData;
   enabled: boolean;
+  admin?: boolean;
   preview?: boolean;
 }) {
   const [success, setSuccess] = useState("");
+  const maintenanceHeld =
+    data.maintenance_required || data.operation === "maintenance";
   const operationLabels: Record<string, string> = {
     outside: "خارج الأتيليه حسب السجل",
     in_atelier: "جاهز داخل الأتيليه",
@@ -411,10 +415,17 @@ export function BookingWorkflow({
           <>أول يوم بعد التجهيز المسجل: {formatDay(data.ready_on)}.</>
         )}
       </p>
+      {maintenanceHeld && (
+        <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-8 text-red-900">
+          الفستان يحتاج صيانة مسجلة. الأدمن وحده يؤكد انتهاء الصيانة ويعيد
+          الجاهزية بعد يوم التجهيز. لا حجز جديد أو تغيير موعد أو تسليم قبل ذلك،
+          ولا تمسح عودة سليمة لاحقة هذا الشرط.
+        </p>
+      )}
       {status === "confirmed" && (
         <HandoverForm
           bookingId={bookingId}
-          enabled={enabled}
+          enabled={enabled && !maintenanceHeld}
           today={data.today}
           inDays={handoverInPlannedDays(data.today, startsOn, returnsOn)}
           hasDeposit={BigInt(paid) > BigInt(0)}
@@ -434,11 +445,11 @@ export function BookingWorkflow({
       )}{" "}
       {status === "returned" &&
         data.return &&
-        data.operation !== "in_atelier" && (
+        (data.operation !== "in_atelier" || maintenanceHeld) && (
           <ReadyForm
             bookingId={bookingId}
             dressId={dressId}
-            enabled={enabled}
+            enabled={enabled && (!maintenanceHeld || admin)}
             today={data.today}
             readyOn={data.ready_on}
             preview={preview}
@@ -447,8 +458,8 @@ export function BookingWorkflow({
         )}
       <p className="border-t pt-5 text-xs leading-7 text-muted-foreground">
         تنبيه التعارض للأدمن مهم لكنه لا يفرض حظر تسليم آليًا، ولا يلغي أو يحرك
-        حجزًا. إنشاء حجز جديد يظل ملتزمًا بيوم التجهيز الكامل بعد يوم الاستلام
-        المسجل.
+        حجزًا. الصيانة المسجلة شرط مستقل لا يرفعه إلا الأدمن. إنشاء حجز جديد يظل
+        ملتزمًا بيوم التجهيز الكامل بعد يوم الاستلام المسجل.
       </p>
     </section>
   );

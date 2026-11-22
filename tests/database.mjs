@@ -2731,7 +2731,7 @@ try {
     "staff configuration is admin-only and profile/finisher grants stay narrow",
     async () => {
       await client.query(
-        "update public.settings set synthetic_test_enabled=true where id=true;update public.profiles set active=true where role='employee'",
+        "update public.settings set synthetic_test_enabled=true where id=true;update public.profiles set active=true where id='22222222-2222-4222-8222-222222222222'",
       );
       assert.equal(
         (await asUser(admin, "select public.get_staff_management_config() c"))
@@ -3083,6 +3083,914 @@ try {
       );
     },
   );
+  await client.query(
+    await fs.readFile(
+      new URL("202611220018_booking_edits.sql", migrationsDir),
+      "utf8",
+    ),
+  );
+  const editSql =
+    "select public.edit_booking($1,$2,$3,$4::date,$5::date,$6,$7,$8) c";
+  const editDays = (
+    await client.query(
+      "select ((now() at time zone 'Africa/Cairo')::date)::text today,((now() at time zone 'Africa/Cairo')::date+10)::text start,((now() at time zone 'Africa/Cairo')::date+11)::text finish,((now() at time zone 'Africa/Cairo')::date+13)::text later",
+    )
+  ).rows[0];
+  let editId, editDress;
+  const editReq = crypto.randomUUID();
+  let editBefore;
+  await check(
+    "booking edits are admin-only, pre-handover and preserve every receipt and identity",
+    async () => {
+      await client.query(
+        "update public.settings set synthetic_test_enabled=true,live_bookings_enabled=true where id=true",
+      );
+      editId = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',$1) id",
+          [employee],
+        )
+      ).rows[0].id;
+      editBefore = (
+        await client.query("select * from public.bookings where id=$1", [
+          editId,
+        ])
+      ).rows[0];
+      editDress = editBefore.dress_id;
+      await deny(
+        employee,
+        editSql,
+        [
+          crypto.randomUUID(),
+          editId,
+          1,
+          editDays.start,
+          editDays.finish,
+          12500,
+          "اختبار",
+          true,
+        ],
+        /not_authorized/,
+      );
+      await deny(
+        inactive,
+        editSql,
+        [
+          crypto.randomUUID(),
+          editId,
+          1,
+          editDays.start,
+          editDays.finish,
+          12500,
+          "اختبار",
+          true,
+        ],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          editId,
+          1,
+          editDays.start,
+          editDays.finish,
+          12500,
+          "اختبار",
+          false,
+        ],
+        /booking_edit_confirmation_required/,
+      );
+      const receipts = (
+        await client.query(
+          "select jsonb_agg(to_jsonb(p) order by id) d from public.payments p where booking_id=$1",
+          [editId],
+        )
+      ).rows[0].d;
+      const result = (
+        await asUser(admin, editSql, [
+          editReq,
+          editId,
+          1,
+          editDays.start,
+          editDays.finish,
+          12500,
+          "اختبار نقل مع المقدم",
+          true,
+        ])
+      ).rows[0].c;
+      assert.equal(result.version, 2);
+      assert.equal(result.unchanged, false);
+      const after = (
+        await client.query("select * from public.bookings where id=$1", [
+          editId,
+        ])
+      ).rows[0];
+      assert.equal(after.customer_id, editBefore.customer_id);
+      assert.equal(after.dress_id, editBefore.dress_id);
+      assert.equal(after.created_by, editBefore.created_by);
+      assert.equal(after.assigned_to, editBefore.assigned_to);
+      assert.equal(after.status, "confirmed");
+      assert.deepEqual(
+        (
+          await client.query(
+            "select jsonb_agg(to_jsonb(p) order by id) d from public.payments p where booking_id=$1",
+            [editId],
+          )
+        ).rows[0].d,
+        receipts,
+      );
+      const history = (
+        await asUser(
+          admin,
+          "select * from public.booking_changes where booking_id=$1",
+          [editId],
+        )
+      ).rows[0];
+      assert.equal(history.recorded_by, admin);
+      assert.equal(history.old_price_piasters, "10000");
+      assert.equal(history.new_price_piasters, "12500");
+      assert.equal(history.reason, "اختبار نقل مع المقدم");
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select * from public.booking_changes where booking_id=$1",
+            [editId],
+          )
+        ).rowCount,
+        0,
+      );
+      await deny(
+        admin,
+        "update public.booking_changes set reason='rewrite' where booking_id=$1",
+        [editId],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "update public.bookings set agreed_price_piasters=1 where id=$1",
+        [editId],
+        /permission denied/,
+      );
+    },
+  );
+  await check(
+    "edit retry is exact, price cannot fall below receipts and stale changes reject",
+    async () => {
+      assert.equal(
+        (
+          await asUser(admin, editSql, [
+            editReq,
+            editId,
+            1,
+            editDays.start,
+            editDays.finish,
+            12500,
+            "اختبار نقل مع المقدم",
+            true,
+          ])
+        ).rows[0].c.version,
+        2,
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select count(*) n from public.booking_changes where booking_id=$1",
+            [editId],
+          )
+        ).rows[0].n,
+        "1",
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          editReq,
+          editId,
+          1,
+          editDays.start,
+          editDays.finish,
+          12400,
+          "اختبار نقل مع المقدم",
+          true,
+        ],
+        /request_id_payload_mismatch/,
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          editId,
+          1,
+          editDays.start,
+          editDays.finish,
+          12500,
+          "اختبار قديم",
+          true,
+        ],
+        /stale_booking_version/,
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          editId,
+          2,
+          editDays.start,
+          editDays.finish,
+          2499,
+          "اختبار أقل من المقدم",
+          true,
+        ],
+        /booking_price_below_receipts/,
+      );
+      assert.equal(
+        (
+          await asUser(admin, editSql, [
+            crypto.randomUUID(),
+            editId,
+            2,
+            editDays.start,
+            editDays.finish,
+            2500,
+            "اختبار مطابق للمقبوض",
+            true,
+          ])
+        ).rows[0].c.version,
+        3,
+      );
+    },
+  );
+  await check(
+    "date editing retains one-day advance and full planned/actual preparation without false no-op history",
+    async () => {
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          editId,
+          3,
+          editDays.today,
+          editDays.today,
+          2500,
+          "اختبار اليوم",
+          true,
+        ],
+        /booking_edit_advance_required/,
+      );
+      const otherBooking = (
+        await asUser(
+          admin,
+          "select public.create_booking(gen_random_uuid(),$1,'اختبار حجز آخر','TEST-EDIT',$2::date,$2::date,10000,0,null) id",
+          [editDress, editDays.later],
+        )
+      ).rows[0].id;
+      const countBefore = (
+        await client.query(
+          "select count(*) n from public.booking_changes where booking_id=$1",
+          [editId],
+        )
+      ).rows[0].n;
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          editId,
+          3,
+          editDays.start,
+          editDays.later,
+          2500,
+          "اختبار تعارض",
+          true,
+        ],
+        /no_dress_overlap/,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select version from public.bookings where id=$1",
+            [editId],
+          )
+        ).rows[0].version,
+        3,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select count(*) n from public.booking_changes where booking_id=$1",
+            [editId],
+          )
+        ).rows[0].n,
+        countBefore,
+      );
+      assert.equal(
+        (
+          await asUser(admin, editSql, [
+            crypto.randomUUID(),
+            editId,
+            3,
+            editDays.start,
+            editDays.finish,
+            2500,
+            "اختبار بلا تغيير",
+            true,
+          ])
+        ).rows[0].c.unchanged,
+        true,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select count(*) n from public.booking_changes where booking_id=$1",
+            [editId],
+          )
+        ).rows[0].n,
+        countBefore,
+      );
+      assert.ok(otherBooking);
+      const todayBooking = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',null) id",
+        )
+      ).rows[0].id;
+      assert.equal(
+        (
+          await asUser(admin, editSql, [
+            crypto.randomUUID(),
+            todayBooking,
+            1,
+            editDays.today,
+            editDays.today,
+            11000,
+            "اختبار السعر فقط",
+            true,
+          ])
+        ).rows[0].c.version,
+        2,
+      );
+    },
+  );
+  await check(
+    "concurrent different edits have one version winner; cancelled and handed-over bookings reject",
+    async () => {
+      const results = await parallelAsUser(
+        editSql,
+        [
+          [
+            crypto.randomUUID(),
+            editId,
+            3,
+            editDays.start,
+            editDays.finish,
+            3000,
+            "اختبار تزامن أ",
+            true,
+          ],
+          [
+            crypto.randomUUID(),
+            editId,
+            3,
+            editDays.start,
+            editDays.finish,
+            3500,
+            "اختبار تزامن ب",
+            true,
+          ],
+        ],
+        admin,
+      );
+      assert.equal(results.filter((r) => r.ok).length, 1);
+      assert.match(
+        results.find((r) => !r.ok).error.message,
+        /stale_booking_version/,
+      );
+      const out = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',null) id",
+        )
+      ).rows[0].id;
+      await asUser(
+        admin,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [out],
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          out,
+          2,
+          editDays.today,
+          editDays.today,
+          11000,
+          "اختبار بعد التسليم",
+          true,
+        ],
+        /booking_edit_before_handover_only/,
+      );
+      const canceled = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',null) id",
+        )
+      ).rows[0].id;
+      await asUser(
+        admin,
+        "select public.cancel_booking(gen_random_uuid(),$1,'اختبار إلغاء',true)",
+        [canceled],
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          canceled,
+          2,
+          editDays.today,
+          editDays.today,
+          11000,
+          "اختبار بعد الإلغاء",
+          true,
+        ],
+        /booking_edit_before_handover_only/,
+      );
+    },
+  );
+  await client.query(
+    await fs.readFile(
+      new URL("202611220019_maintenance_availability.sql", migrationsDir),
+      "utf8",
+    ),
+  );
+  let maintenanceBooking, maintenanceDress, futureBooking;
+  const maintenanceFuture = (
+    await client.query(
+      "select ((now() at time zone 'Africa/Cairo')::date+3)::text d",
+    )
+  ).rows[0].d;
+  await check(
+    "a currently outside dress accepts only a nonoverlapping future booking after preparation",
+    async () => {
+      maintenanceBooking = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',$1) id",
+          [employee],
+        )
+      ).rows[0].id;
+      maintenanceDress = (
+        await client.query("select dress_id from public.bookings where id=$1", [
+          maintenanceBooking,
+        ])
+      ).rows[0].dress_id;
+      await asUser(
+        employee,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [maintenanceBooking],
+      );
+      futureBooking = (
+        await asUser(
+          employee,
+          "select public.create_booking(gen_random_uuid(),$1,'اختبار موعد مستقبلي','TEST-FUTURE',$2::date,$2::date,10000,0,null) id",
+          [maintenanceDress, maintenanceFuture],
+        )
+      ).rows[0].id;
+      await deny(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'اختبار يوم تجهيز','TEST-PREP',(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+1,10000,0,null)",
+        [maintenanceDress],
+        /no_dress_overlap/,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select status from public.dress_operations where dress_id=$1",
+            [maintenanceDress],
+          )
+        ).rows[0].status,
+        "outside",
+      );
+    },
+  );
+  await check(
+    "maintenance blocks new bookings, date moves, suggestions and handover without cancelling existing bookings",
+    async () => {
+      await asUser(
+        employee,
+        "select public.record_booking_receipt(gen_random_uuid(),$1,7500,null,'return_balance',true)",
+        [maintenanceBooking],
+      );
+      await asUser(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'maintenance',array['zipper'])",
+        [maintenanceBooking],
+      );
+      const op = (
+        await client.query(
+          "select * from public.dress_operations where dress_id=$1",
+          [maintenanceDress],
+        )
+      ).rows[0];
+      assert.equal(op.status, "maintenance");
+      assert.equal(op.maintenance_required, true);
+      await deny(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'اختبار حجز صيانة','TEST-MAINT',$2::date+5,$2::date+5,10000,0,null)",
+        [maintenanceDress, maintenanceFuture],
+        /dress_in_maintenance/,
+      );
+      await deny(
+        admin,
+        "select public.next_available_day($1,$2::date,0)",
+        [maintenanceDress, maintenanceFuture],
+        /dress_in_maintenance/,
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          futureBooking,
+          1,
+          editDays.start,
+          editDays.finish,
+          10000,
+          "اختبار نقل خلال صيانة",
+          true,
+        ],
+        /dress_in_maintenance/,
+      );
+      await deny(
+        admin,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [futureBooking],
+        /maintenance_admin_clear_required/,
+      );
+      assert.equal(
+        (
+          await client.query("select status from public.bookings where id=$1", [
+            futureBooking,
+          ])
+        ).rows[0].status,
+        "confirmed",
+      );
+      assert.equal(
+        (
+          await asUser(admin, editSql, [
+            crypto.randomUUID(),
+            futureBooking,
+            1,
+            maintenanceFuture,
+            maintenanceFuture,
+            11000,
+            "اختبار سعر فقط",
+            true,
+          ])
+        ).rows[0].c.version,
+        2,
+      );
+    },
+  );
+  await check(
+    "employees cannot clear maintenance indirectly; even admin keeps the complete actual-return preparation day",
+    async () => {
+      await deny(
+        employee,
+        "select public.set_dress_operation($1,'preparation')",
+        [maintenanceDress],
+        /maintenance_admin_clear_required/,
+      );
+      await deny(
+        employee,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [maintenanceDress],
+        /maintenance_admin_clear_required/,
+      );
+      await asUser(
+        admin,
+        "select public.set_dress_operation($1,'preparation')",
+        [maintenanceDress],
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select maintenance_required from public.dress_operations where dress_id=$1",
+            [maintenanceDress],
+          )
+        ).rows[0].maintenance_required,
+        true,
+      );
+      await deny(
+        employee,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [maintenanceDress],
+        /maintenance_admin_clear_required/,
+      );
+      await deny(
+        admin,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [maintenanceDress],
+        /preparation_day_not_finished/,
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          futureBooking,
+          2,
+          (
+            await client.query(
+              "select ((now() at time zone 'Africa/Cairo')::date+1)::text d",
+            )
+          ).rows[0].d,
+          maintenanceFuture,
+          11000,
+          "اختبار يوم تجهيز فعلي",
+          true,
+        ],
+        /dress_in_maintenance/,
+      );
+      // Local-only clock fixture. Never backdate real hosted acceptance records.
+      await client.query(
+        "update public.return_records set returned_on=returned_on-2 where booking_id=$1",
+        [maintenanceBooking],
+      );
+      await asUser(
+        admin,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [maintenanceDress],
+      );
+      assert.deepEqual(
+        (
+          await client.query(
+            "select status,maintenance_required from public.dress_operations where dress_id=$1",
+            [maintenanceDress],
+          )
+        ).rows[0],
+        { status: "in_atelier", maintenance_required: false },
+      );
+      await asUser(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'اختبار بعد الصيانة','TEST-CLEARED',$2::date+5,$2::date+5,10000,0,null)",
+        [maintenanceDress, maintenanceFuture],
+      );
+    },
+  );
+  await check(
+    "a later sound return cannot erase maintenance when a collision left another booking outside",
+    async () => {
+      const old = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'overdue',$1) id",
+          [employee],
+        )
+      ).rows[0].id;
+      const second = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',$1) id",
+          [employee],
+        )
+      ).rows[0].id;
+      const d = (
+        await client.query("select dress_id from public.bookings where id=$1", [
+          old,
+        ])
+      ).rows[0].dress_id;
+      // Local-only collision fixture joins two independent synthetic scenarios.
+      // Shift the overdue planned return back one day so today's booking starts
+      // after its full planned preparation day, while its actual loan is late.
+      await client.query(
+        "update public.bookings set returns_on=returns_on-1 where id=$1",
+        [old],
+      );
+      await client.query("update public.bookings set dress_id=$1 where id=$2", [
+        d,
+        second,
+      ]);
+      await asUser(
+        employee,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [second],
+      );
+      await asUser(
+        employee,
+        "select public.record_booking_receipt(gen_random_uuid(),$1,7500,null,'return_balance',true)",
+        [old],
+      );
+      await asUser(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'maintenance',array['sewing'])",
+        [old],
+      );
+      assert.deepEqual(
+        (
+          await client.query(
+            "select status,maintenance_required from public.dress_operations where dress_id=$1",
+            [d],
+          )
+        ).rows[0],
+        { status: "outside", maintenance_required: true },
+      );
+      await asUser(
+        employee,
+        "select public.record_booking_receipt(gen_random_uuid(),$1,7500,null,'return_balance',true)",
+        [second],
+      );
+      await asUser(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [second],
+      );
+      assert.deepEqual(
+        (
+          await client.query(
+            "select status,maintenance_required from public.dress_operations where dress_id=$1",
+            [d],
+          )
+        ).rows[0],
+        { status: "preparation", maintenance_required: true },
+      );
+      assert.equal(
+        (
+          await asUser(employee, "select public.get_booking_workflow($1) w", [
+            second,
+          ])
+        ).rows[0].w.maintenance_required,
+        true,
+      );
+      await deny(
+        employee,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [d],
+        /maintenance_admin_clear_required/,
+      );
+      await deny(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'اختبار شرط مستمر','TEST-HOLD',$2::date+10,$2::date+10,10000,0,null)",
+        [d, maintenanceFuture],
+        /dress_in_maintenance/,
+      );
+    },
+  );
+  await check(
+    "date-move versus handover and repricing versus receipt serialize without losing money/history",
+    async () => {
+      const b = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',null) id",
+        )
+      ).rows[0].id;
+      const move = await parallelAsUser(
+        "select case when $1::boolean then public.edit_booking($2,$3,1,$4::date,$5::date,11000,'اختبار تزامن تسليم',true) else jsonb_build_object('handover',public.record_handover($2,$3,true,true)) end c",
+        [
+          [true, crypto.randomUUID(), b, editDays.start, editDays.finish],
+          [false, crypto.randomUUID(), b, editDays.start, editDays.finish],
+        ],
+        admin,
+      );
+      assert.equal(move.filter((r) => r.ok).length, 1);
+      assert.match(
+        move.find((r) => !r.ok).error.message,
+        /booking_edit_before_handover_only|outside_planned_handover_days/,
+      );
+      const future = (
+        await client.query(
+          "select ((now() at time zone 'Africa/Cairo')::date+30)::text d",
+        )
+      ).rows[0].d;
+      const freshBooking = (
+        await asUser(
+          admin,
+          "select public.create_booking(gen_random_uuid(),$1,'اختبار تزامن قبض','TEST-RACE',$2::date,$2::date,10000,0,null) id",
+          [editDress, future],
+        )
+      ).rows[0].id;
+      const money = await parallelAsUser(
+        "select case when $1::boolean then public.edit_booking($2,$3,1,$4::date,$4::date,2500,'اختبار تزامن قبض',true) else jsonb_build_object('payment',public.record_booking_receipt($2,$3,5000,null,'deposit',false)) end c",
+        [
+          [true, crypto.randomUUID(), freshBooking, future],
+          [false, crypto.randomUUID(), freshBooking, future],
+        ],
+        admin,
+      );
+      assert.equal(money.filter((r) => r.ok).length, 1);
+      assert.match(
+        money.find((r) => !r.ok).error.message,
+        /booking_price_below_receipts|invalid_amount_or_overpayment/,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select agreed_price_piasters>=(select coalesce(sum(amount_piasters),0) from public.payments where booking_id=b.id) safe from public.bookings b where id=$1",
+            [freshBooking],
+          )
+        ).rows[0].safe,
+        true,
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=false where id=true",
+      );
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          freshBooking,
+          1,
+          future,
+          future,
+          5000,
+          "اختبار بوابة",
+          true,
+        ],
+        /policy_decisions_pending/,
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=true where id=true",
+      );
+    },
+  );
+  await check(
+    "rescheduling cannot cut the actual preparation day after a sound return",
+    async () => {
+      const returned = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'return',null) id",
+        )
+      ).rows[0].id;
+      const d = (
+        await client.query("select dress_id from public.bookings where id=$1", [
+          returned,
+        ])
+      ).rows[0].dress_id;
+      await asUser(
+        admin,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [returned],
+      );
+      const next = (
+        await asUser(
+          admin,
+          "select public.create_booking(gen_random_uuid(),$1,'اختبار تجهيز تعديل','TEST-EDIT-PREP',$2::date,$2::date,10000,0,null) id",
+          [d, maintenanceFuture],
+        )
+      ).rows[0].id;
+      const tomorrow = (
+        await client.query(
+          "select ((now() at time zone 'Africa/Cairo')::date+1)::text d",
+        )
+      ).rows[0].d;
+      await deny(
+        admin,
+        editSql,
+        [
+          crypto.randomUUID(),
+          next,
+          1,
+          tomorrow,
+          tomorrow,
+          10000,
+          "اختبار تجهيز فعلي",
+          true,
+        ],
+        /actual_preparation_conflict/,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select version from public.bookings where id=$1",
+            [next],
+          )
+        ).rows[0].version,
+        1,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select count(*) n from public.booking_changes where booking_id=$1",
+            [next],
+          )
+        ).rows[0].n,
+        "0",
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,
@@ -3093,7 +4001,7 @@ try {
     );
   });
   await check(
-    "fresh database applies all17 migrations and enforces the corrected final receipt/cancellation boundary",
+    "fresh database applies all19 migrations and enforces the corrected final receipt/cancellation boundary",
     async () => {
       await client.query("create database atelier_fresh");
       const previous = client;
@@ -3135,6 +4043,8 @@ try {
         ).rows[0].c;
         assert.equal(cfg.receipt_timing_ready, true);
         assert.equal(cfg.cancellation_ready, true);
+        assert.equal(cfg.booking_edit_ready, true);
+        assert.equal(cfg.maintenance_admin_ready, true);
         assert.equal(
           (await asUser(admin, "select public.get_staff_management_config() c"))
             .rows[0].c.ready,

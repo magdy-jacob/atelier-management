@@ -939,3 +939,91 @@ test("team preview protects admin role, labels synthetic creation and preserves 
   ).toBeTruthy();
   expect(errors).toEqual([]);
 });
+
+test("admin booking-edit preview retains inputs, shows history and closes editing after handover", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/booking-edit");
+  await expect(
+    page.getByRole("button", { name: "حفظ تعديل الموعد والسعر" }),
+  ).toBeDisabled();
+  await page.getByLabel("بداية الحجز الجديدة").fill("2026-12-10");
+  await page.getByLabel("العودة المخططة الجديدة").fill("2026-12-11");
+  await page.getByLabel("السعر المتفق عليه بالجنيه").fill("150.25");
+  await page.getByLabel("سبب تعديل الحجز").fill("اختبار تعديل محتفظ بقيمه");
+  await page.locator('[name="confirm"]').check();
+  await page
+    .locator('[name="reason"]')
+    .evaluate((e: HTMLTextAreaElement) => e.form!.reset());
+  await expect(page.getByLabel("بداية الحجز الجديدة")).toHaveValue(
+    "2026-12-10",
+  );
+  await expect(page.getByLabel("السعر المتفق عليه بالجنيه")).toHaveValue(
+    "150.25",
+  );
+  await expect(page.getByLabel("سبب تعديل الحجز")).toHaveValue(
+    "اختبار تعديل محتفظ بقيمه",
+  );
+  await expect(page.locator('[name="confirm"]')).toBeChecked();
+  await expect(
+    page.getByText("اختبار نقل الموعد مع الاحتفاظ بالمقدم", { exact: false }),
+  ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(100);
+  await page.screenshot({
+    path: "evidence/booking-edit-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(100);
+  await page.screenshot({
+    path: "evidence/booking-edit-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  for (const view of ["out", "cancelled", "employee"]) {
+    await page.goto(`/demo/booking-edit?view=${view}`);
+    await expect(page.getByLabel("سبب تعديل الحجز")).toHaveCount(0);
+  }
+  await expect(
+    page.getByText("تاريخ تعديل الحجز، للأدمن", { exact: true }),
+  ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("maintenance clearance is explicitly admin-only and separate from ordinary collision notices", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/workflow?view=returned");
+  await expect(page.getByText(/الأدمن وحده يؤكد انتهاء الصيانة/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "تأكيد اكتمال التجهيز", exact: true }),
+  ).toBeDisabled();
+  await page.screenshot({
+    path: "evidence/maintenance-employee-mobile.png",
+    fullPage: true,
+  });
+  await page.goto("/demo/workflow?view=maintenance-admin");
+  await expect(page.getByText(/الأدمن وحده يؤكد انتهاء الصيانة/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "تأكيد اكتمال التجهيز", exact: true }),
+  ).toBeDisabled();
+  await page.screenshot({
+    path: "evidence/maintenance-admin-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+});

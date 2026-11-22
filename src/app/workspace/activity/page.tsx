@@ -20,6 +20,11 @@ const entities = [
   "bookings",
   "payments",
   "late_fees",
+  "booking_changes",
+  "booking_cancellations",
+  "receipt_confirmations",
+  "employee_account_jobs",
+  "employee_profile_changes",
 ];
 export default async function Activity({
   searchParams,
@@ -60,7 +65,7 @@ export default async function Activity({
   return (
     <StaffFrame
       title="سجل النشاط"
-      description="آخر ١٠٠ حدث مطابق، للأدمن فقط. لا يمكن تعديل أو حذف السجل من حسابات التطبيق. التوقيت والفلاتر الزمنية هنا UTC لحين اعتماد منطقة الفرع الزمنية."
+      description="آخر ١٠٠ حدث مطابق، للأدمن فقط. لا يمكن تعديل أو حذف السجل من حسابات التطبيق. التوقيت والفلاتر الزمنية هنا UTC كما هو موضح في الحقول؛ تواريخ الحجز والتشغيل بأيام مصر."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/activity"

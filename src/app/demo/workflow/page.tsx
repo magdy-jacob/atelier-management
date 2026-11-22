@@ -8,13 +8,20 @@ export default async function WorkflowPreview({
   searchParams: Promise<{ view?: string }>;
 }) {
   const requested = (await searchParams).view ?? "return";
-  const view = ["handover", "return", "unpaid", "returned"].includes(requested)
+  const view = [
+    "handover",
+    "return",
+    "unpaid",
+    "returned",
+    "maintenance-admin",
+  ].includes(requested)
     ? requested
     : "return";
-  const returned = view === "returned";
+  const returned = view === "returned" || view === "maintenance-admin";
+  const admin = view === "maintenance-admin";
   const handover = view === "handover";
   const data: WorkflowData = {
-    today: "2026-12-05",
+    today: admin ? "2026-12-07" : "2026-12-05",
     handover: handover
       ? null
       : {
@@ -35,14 +42,15 @@ export default async function WorkflowPreview({
       : null,
     operation: handover ? "in_atelier" : returned ? "maintenance" : "outside",
     ready_on: returned ? "2026-12-07" : null,
+    maintenance_required: returned,
   };
   return (
     <StaffFrame
       preview
       title="التسليم والعودة والفحص"
       description="معاينة بنفس مكونات الحجز الفعلي، ببيانات مصطنعة وحفظ معطل. لا رقم أو صورة هوية، ولا صورة فحص أو تحصيل إلكتروني."
-      name="موظف تجريبي"
-      role="employee"
+      name={admin ? "أدمن تجريبي" : "موظف تجريبي"}
+      role={admin ? "admin" : "employee"}
       active="/workspace/bookings"
     >
       <nav className="flex flex-wrap gap-2" aria-label="حالات معاينة الدورة">
@@ -51,6 +59,7 @@ export default async function WorkflowPreview({
           ["return", "عودة بعد سداد الرصيد"],
           ["unpaid", "عودة برصيد لم يُسدد"],
           ["returned", "فحص محفوظ وتجهيز"],
+          ["maintenance-admin", "إنهاء صيانة، أدمن"],
         ].map(([key, label]) => (
           <Link
             key={key}
@@ -62,6 +71,7 @@ export default async function WorkflowPreview({
         ))}
       </nav>
       <BookingWorkflow
+        admin={admin}
         key={view}
         bookingId="demo-booking"
         dressId="demo-dress"

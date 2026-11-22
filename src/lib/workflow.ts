@@ -60,5 +60,6 @@ export const workflowSchema = z.object({
     .enum(["in_atelier", "outside", "preparation", "maintenance"])
     .nullable(),
   ready_on: z.string().refine(validDay).nullable(),
+  maintenance_required: z.boolean().default(false),
 });
 export type WorkflowData = z.infer<typeof workflowSchema>;

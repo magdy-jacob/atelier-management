@@ -1,3 +1,4 @@
+import { BookingEditPanel } from "@/components/atelier/booking-edit-panel";
 import { CancellationPanel } from "@/components/atelier/cancellation-panel";
 import { BookingWorkflow } from "@/components/atelier/booking-workflow";
 import { workflowSchema } from "@/lib/workflow";
@@ -26,7 +27,7 @@ export default async function BookingDetails({
   const { data: b, error } = await db
     .from("bookings")
     .select(
-      "id,dress_id,customer_id,starts_on,returns_on,status,agreed_price_piasters,dresses(name,code),customers(full_name,phone)",
+      "id,version,dress_id,customer_id,starts_on,returns_on,status,agreed_price_piasters,dresses(name,code),customers(full_name,phone)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -64,6 +65,25 @@ export default async function BookingDetails({
   );
   const remaining =
     BigInt(String(b.agreed_price_piasters)) + feeTotal - paidTotal;
+  const changeResult =
+    profile.role === "admin" && config?.booking_edit_ready
+      ? await db
+          .from("booking_changes")
+          .select(
+            "id,reason,old_start,old_return,new_start,new_return,old_price_piasters,new_price_piasters,recorded_by,created_at,profiles(full_name)",
+          )
+          .eq("booking_id", id)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      : null;
+  const changes = (changeResult?.data ?? []).map((h) => ({
+    ...h,
+    old_price_piasters: String(h.old_price_piasters),
+    new_price_piasters: String(h.new_price_piasters),
+    actor_name:
+      (Array.isArray(h.profiles) ? h.profiles[0] : h.profiles)?.full_name ??
+      null,
+  }));
   const cancellationResult = config?.cancellation_ready
     ? await db
         .from("booking_cancellations")
@@ -183,6 +203,7 @@ export default async function BookingDetails({
         !feeError &&
         (workflow?.success ? (
           <BookingWorkflow
+            admin={profile.role === "admin"}
             key={b.id}
             bookingId={b.id}
             dressId={b.dress_id}
@@ -196,6 +217,28 @@ export default async function BookingDetails({
           />
         ) : (
           <Unavailable />
+        ))}
+      {!paymentError &&
+        !feeError &&
+        (changeResult?.error ? (
+          <Unavailable />
+        ) : (
+          <BookingEditPanel
+            booking={{
+              id: b.id,
+              version: b.version,
+              starts_on: b.starts_on,
+              returns_on: b.returns_on,
+              agreed_price_piasters: String(b.agreed_price_piasters),
+              status: b.status,
+            }}
+            paid={paidTotal.toString()}
+            admin={profile.role === "admin"}
+            enabled={
+              bookingConfigReady(config) && config?.booking_edit_ready === true
+            }
+            history={changes}
+          />
         ))}
       {cancellationResult?.error ? (
         <Unavailable />

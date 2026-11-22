@@ -1,4 +1,4 @@
-# Verification record, 0.18.0
+# Verification record, 0.19.0
 
 Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
 
@@ -6,9 +6,9 @@ Checked locally on 22 November 2026. This source checkpoint is not a claim that 
 
 - ESLint and TypeScript: pass.
 - 48 unit tests: pass.
-- 191 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
+- 227 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
 - Optimized Next.js builds with functional portfolio flag off and on: pass.
-- 20 Chrome browser scenarios in each optimized flag-off/flag-on build: pass.
+- 22 Chrome browser scenarios in the optimized functional build: pass. A separate default-flag build is also verified.
 - npm audit with production dependencies: zero reported vulnerabilities at this checkpoint. An audit is not a security guarantee.
 
 ## Functional synthetic mode coverage
@@ -155,3 +155,11 @@ New checks cover fixed server-chosen Auth targets; exact job retry/payload bindi
 The browser test checks real HTML email validation, protected admin row, disabled non-saving preview controls, retained form values after native reset, desktop/mobile layout and no overflow. Actual pixels in `evidence/team-desktop.png` and `evidence/team-mobile.png` were inspected. No actual account/password/key was created or used during these local tests. Secret environment references are server-only. The source does not send invitation or confirmation email.
 
 Hosted acceptance still needs a disposable synthetic Auth creation, actual sign-in, correct employee scope, admin-only operations, name change, deactivation blocking an existing employee session, reactivation, retry/recovery feedback and original review-data preservation. Verify email_confirm/private app_metadata/fixed-ID behavior against the real project. Do not delete a live Auth account on an uncertain response. No password reset or role promotion is shipped, and full MVP completion is not claimed.
+
+## Booking edits and maintenance 0.19.0
+
+48 unit tests and227 local PostgreSQL checks pass, including upgrade checkpoints18/19 and an all19 fresh install. New tests cover admin-only pre-handover changes, exact retry/changed replay, reason/confirmation, immutable receipts/customer/dress/assignment, price>=receipts, stale edits and actual/planned preparation. Competing different edits have one version winner; date-move versus handover and repricing versus initial receipt serialize with one valid winner and no money/history loss. Cancellation/out states reject. Unchanged values create no fake history.
+
+Availability tests accept a future nonoverlapping reservation for a currently-out dress, reject its preparation day, and preserve existing future bookings when maintenance is recorded. Maintenance prevents new bookings/date moves/suggestions/handover. Employees cannot route through preparation to clear it; admin clearance still respects actual-return preparation. A two-booking collision fixture proves maintenance remains true through an outside state and a later sound return. Local fixtures deliberately backdate/construct synthetic historical cases for clock-bound branches; these are not a method for hosted acceptance or claims of real events.
+
+22 Chrome scenarios pass on the functional build, including edit role/state limits, history, retained native/controlled inputs, explicit Arabic date summary and maintenance admin/employee messaging. The first screenshot check found a sticky-banner capture artifact after input auto-scroll; screenshots were retaken from scroll-top and inspected again. Evidence: booking-edit-desktop/mobile and maintenance-admin/employee-mobile. Hosted acceptance and real Auth/Storage are separate, and no live rows/accounts were changed by this source work. Public catalogue availability remains a manually chosen label, not a date-specific promise.

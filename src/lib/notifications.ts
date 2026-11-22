@@ -1,10 +1,16 @@
 import { z } from "zod";
-export const notificationKinds = ["outgoing", "incoming", "overdue"] as const;
+export const notificationKinds = [
+  "outgoing",
+  "incoming",
+  "overdue",
+  "collision",
+] as const;
 export type NotificationKind = (typeof notificationKinds)[number];
 export const notificationLabels: Record<NotificationKind, string> = {
   outgoing: "تجهيز وخروج",
   incoming: "عودة اليوم",
   overdue: "متأخر عن العودة",
+  collision: "مهم: حجز تالٍ متأثر",
 };
 export const notificationSchema = z.object({
   booking_id: z.string(),
@@ -15,6 +21,8 @@ export const notificationSchema = z.object({
   dress_name: z.string(),
   customer_name: z.string(),
   read_at: z.string().nullable(),
+  related_booking_id: z.string().nullable().optional(),
+  related_starts_on: z.string().nullable().optional(),
 });
 export const notificationResultSchema = z.object({
   today: z.string(),

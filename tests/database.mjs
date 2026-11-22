@@ -782,6 +782,102 @@ try {
     },
   );
   await check(
+    "late-return collision is a critical admin notice without changing bookings",
+    async () => {
+      const late = (
+        await asUser(
+          admin,
+          "select public.get_admin_notifications('overdue') as d",
+        )
+      ).rows[0].d.items[0];
+      const next = (
+        await client.query(
+          "insert into public.bookings(request_id,dress_id,customer_id,starts_on,returns_on,agreed_price_piasters,created_by) select gen_random_uuid(),dress_id,customer_id,(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+2,100000,$2 from public.bookings where id=$1 returning id",
+          [late.booking_id, admin],
+        )
+      ).rows[0].id;
+      const before = (
+        await client.query(
+          "select jsonb_agg(to_jsonb(b) order by id) d from public.bookings b",
+        )
+      ).rows[0].d;
+      let collision = (
+        await asUser(
+          admin,
+          "select public.get_admin_notifications('collision') as d",
+        )
+      ).rows[0].d;
+      assert.equal(collision.total, 1);
+      assert.equal(collision.items[0].related_booking_id, next);
+      const alert = collision.items[0];
+      await deny(
+        employee,
+        "select public.get_admin_notifications('collision')",
+        [],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "select public.mark_notification_read($1,'collision',$2::date+1)",
+        [alert.booking_id, alert.event_on],
+        /notification_not_active/,
+      );
+      await asUser(
+        admin,
+        "select public.mark_notification_read($1,'collision',$2)",
+        [alert.booking_id, alert.event_on],
+      );
+      await asUser(
+        admin,
+        "select public.mark_notification_read($1,'collision',$2)",
+        [alert.booking_id, alert.event_on],
+      );
+      collision = (
+        await asUser(
+          admin,
+          "select public.get_admin_notifications('collision') as d",
+        )
+      ).rows[0].d;
+      assert.equal(collision.total, 1);
+      assert.ok(collision.items[0].read_at);
+      assert.deepEqual(
+        (
+          await client.query(
+            "select jsonb_agg(to_jsonb(b) order by id) d from public.bookings b",
+          )
+        ).rows[0].d,
+        before,
+      );
+      await client.query(
+        "update public.bookings set status='cancelled' where id=$1",
+        [next],
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.get_admin_notifications('collision') as d",
+          )
+        ).rows[0].d.total,
+        0,
+      );
+      await client.query(
+        "update public.bookings set status='confirmed',starts_on=(now() at time zone 'Africa/Cairo')::date+2,returns_on=(now() at time zone 'Africa/Cairo')::date+3 where id=$1",
+        [next],
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.get_admin_notifications('collision') as d",
+          )
+        ).rows[0].d.total,
+        0,
+      );
+      await client.query("delete from public.bookings where id=$1", [next]);
+    },
+  );
+  await check(
     "manual overdue fee is gated, admin-only and never a receipt",
     async () => {
       const late = (

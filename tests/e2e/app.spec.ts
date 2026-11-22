@@ -477,3 +477,44 @@ test("category editing preview preserves used dress history and is responsive", 
   await expect(page).toHaveURL(/login/);
   expect(errors).toEqual([]);
 });
+
+test("critical collision notice is prominent and does not promise an automatic hold", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/notifications/collision");
+  await expect(page.getByRole("article")).toHaveCount(1);
+  await expect(
+    page.getByRole("heading", {
+      name: "تنبيه مهم للأدمن: راجع الحجز التالي",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText(/لا يلغي أو يحرك حجزًا/)).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "فتح الحجز المتأثر", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "تعليم كمقروء", exact: true }),
+  ).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/collision-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/notifications/collision");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/collision-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  expect(errors).toEqual([]);
+});

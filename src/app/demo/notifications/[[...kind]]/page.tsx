@@ -21,6 +21,18 @@ export default async function NotificationPreview({
   const filter = parsed?.success ? parsed.data : undefined;
   const items: OperationalNotification[] = [
     {
+      booking_id: "preview-critical",
+      kind: "collision",
+      event_on: "2026-12-05",
+      starts_on: "2026-12-03",
+      returns_on: "2026-12-04",
+      dress_name: "ليلة مخمل · تنبيه مهم تجريبي",
+      customer_name: "عميلة تجريبية ٣",
+      read_at: null,
+      related_booking_id: "preview-next",
+      related_starts_on: "2026-12-06",
+    },
+    {
       booking_id: "preview-1",
       kind: "outgoing",
       event_on: "2026-12-05",

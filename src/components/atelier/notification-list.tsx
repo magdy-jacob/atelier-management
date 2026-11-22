@@ -24,11 +24,11 @@ function NotificationItem({
   );
   return (
     <article
-      className={`rounded-2xl border p-5 md:p-6 ${item.kind === "overdue" ? "border-red-200 bg-red-50" : "bg-white"}`}
+      className={`rounded-2xl border p-5 md:p-6 ${item.kind === "collision" ? "border-2 border-red-700 bg-red-50" : item.kind === "overdue" ? "border-red-200 bg-red-50" : "bg-white"}`}
     >
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <span
-          className={`rounded-full px-3 py-1 text-[11px] ${item.kind === "overdue" ? "bg-red-100 text-red-900" : "bg-secondary text-primary"}`}
+          className={`rounded-full px-3 py-1 text-[11px] ${["collision", "overdue"].includes(item.kind) ? "bg-red-100 text-red-900" : "bg-secondary text-primary"}`}
         >
           {notificationLabels[item.kind]}
         </span>
@@ -64,6 +64,35 @@ function NotificationItem({
           تمت القراءة في {formatDay(dateInZone(item.read_at, "Africa/Cairo"))}.
           التعليم كمقروء لا يؤكد تسليمًا أو عودة.
         </p>
+      )}
+      {item.kind === "collision" && (
+        <div className="mb-5 space-y-3 rounded-xl border border-red-200 bg-white p-4 text-xs leading-7 text-red-950">
+          <h3 className="font-semibold">تنبيه مهم للأدمن: راجع الحجز التالي</h3>
+          <p>
+            الفستان ما زال مسجلًا خارج الأتيليه بعد موعد العودة، وأقرب حجز تالٍ
+            اقترب أو بدأ موعده. راجع تأثير التأخير ويوم التجهيز مع المسؤول عن
+            الحجز.
+          </p>
+          {item.related_starts_on && (
+            <p>بداية الحجز المتأثر: {formatDay(item.related_starts_on)}</p>
+          )}
+          {item.related_booking_id && (
+            <Link
+              className="inline-block underline underline-offset-4"
+              href={
+                preview
+                  ? "/demo/records"
+                  : `/workspace/bookings/${item.related_booking_id}`
+              }
+            >
+              فتح الحجز المتأثر
+            </Link>
+          )}
+          <p>
+            هذا تنبيه فقط. لا يلغي أو يحرك حجزًا ولا يفرض حظر تسليم آليًا بسبب
+            التعارض. قواعد إنشاء الحجوزات ويوم التجهيز لم تتغير.
+          </p>
+        </div>
       )}
       <form
         action={preview ? undefined : action}

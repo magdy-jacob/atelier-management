@@ -434,7 +434,7 @@ export async function markNotificationRead(
   const parsed = z
     .object({
       booking_id: z.uuid(),
-      kind: z.enum(["outgoing", "incoming", "overdue"]),
+      kind: z.enum(["outgoing", "incoming", "overdue", "collision"]),
       event_on: z.string().refine(validDay),
     })
     .safeParse(Object.fromEntries(form));
@@ -457,6 +457,7 @@ export async function markNotificationRead(
     "/workspace/notifications/outgoing",
     "/workspace/notifications/incoming",
     "/workspace/notifications/overdue",
+    "/workspace/notifications/collision",
   ])
     revalidatePath(path);
   return { success: "تم التعليم كمقروء. يظل التنبيه ظاهرًا حتى معالجة سببه." };

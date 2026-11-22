@@ -87,6 +87,12 @@ export default async function Workspace({
               </Link>
               <Link
                 className="rounded-full border bg-white px-4 py-2"
+                href="/workspace/reports"
+              >
+                تقارير القبض والتصدير
+              </Link>
+              <Link
+                className="rounded-full border bg-white px-4 py-2"
                 href="/workspace/categories"
               >
                 إدارة التصنيفات
@@ -127,7 +133,7 @@ export default async function Workspace({
         <p className="rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
           يتاح للأدمن إضافة الفساتين وتحريرها وأرشفتها ورفع صورها. التشغيل
           التشغيلي والمالي معطل في نسخة الاختبار، وباقي الإلغاء وإدارة الموظفين
-          والتقارير ضمن التطوير. لا تستخدم بيانات عملاء حقيقية قبل اختبارات
+          وتقارير أخرى ضمن التطوير. لا تستخدم بيانات عملاء حقيقية قبل اختبارات
           القبول.
         </p>
         {(categoryError || dressError || bookingError) && (

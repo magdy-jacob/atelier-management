@@ -619,3 +619,43 @@ test("a recorded late return keeps its critical preparation impact visible", asy
     fullPage: true,
   });
 });
+
+test("receipt report explains its cash basis and downloads only reconciled synthetic CSV in preview", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/reports");
+  await expect(
+    page.getByRole("heading", { name: "دفتر القبض والتصدير", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/ليس قيمة الحجوزات/)).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("link", { name: "تنزيل CSV مصطنع فقط", exact: true })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("lovely-DEMO-ONLY-receipts.csv");
+  const { readFile } = await import("node:fs/promises");
+  const csv = await readFile((await download.path())!, "utf8");
+  expect(csv.startsWith("\uFEFF")).toBeTruthy();
+  expect(csv).toContain("DEMO-NO-PHONE-01");
+  expect(csv).toContain("1000.25");
+  await page.screenshot({
+    path: "evidence/reports-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "evidence/reports-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/workspace/reports");
+  await expect(page).toHaveURL(/login/);
+  await page.goto("/workspace/reports/download?from=2026-12-01&to=2026-12-05");
+  await expect(page).toHaveURL(/login/);
+});

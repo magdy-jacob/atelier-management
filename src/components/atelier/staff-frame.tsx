@@ -26,6 +26,7 @@ export function StaffFrame({
     ...(role === "admin"
       ? [
           ["/workspace/dashboard", "لوحة الأدمن"],
+          ["/workspace/reports", "تقارير القبض والتصدير"],
           ["/workspace/notifications", "مركز الإشعارات"],
           ["/workspace/customers", "العملاء"],
           ["/workspace/activity", "سجل النشاط"],
@@ -61,9 +62,11 @@ export function StaffFrame({
               key={href}
               href={
                 preview
-                  ? href === "/workspace/categories"
-                    ? "/demo/categories"
-                    : "/demo"
+                  ? href === "/workspace/reports"
+                    ? "/demo/reports"
+                    : href === "/workspace/categories"
+                      ? "/demo/categories"
+                      : "/demo"
                   : href
               }
               className={`rounded-full border px-4 py-2 text-xs ${active === href ? "border-primary bg-primary text-white" : "bg-white text-muted-foreground"}`}

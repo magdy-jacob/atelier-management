@@ -656,6 +656,109 @@ try {
     },
   );
   await check(
+    "receipt report matches journal and Cairo summary; non-admins and anon denied",
+    async () => {
+      const report = (
+        await asUser(
+          admin,
+          "select public.admin_receipt_report((now() at time zone 'Africa/Cairo')::date,(now() at time zone 'Africa/Cairo')::date) d",
+        )
+      ).rows[0].d;
+      const summary = (
+        await asUser(
+          admin,
+          "select public.admin_dashboard((now() at time zone 'Africa/Cairo')::date,(now() at time zone 'Africa/Cairo')::date) d",
+        )
+      ).rows[0].d;
+      assert.equal(report.count, report.rows.length);
+      assert.equal(report.count, summary.receipt_count);
+      assert.equal(report.amount_piasters, summary.receipt_piasters);
+      assert.equal(
+        report.rows
+          .reduce((a, r) => a + BigInt(r.amount_piasters), 0n)
+          .toString(),
+        report.amount_piasters,
+      );
+      for (const uid of [employee, other, inactive])
+        await deny(
+          uid,
+          "select public.admin_receipt_report(current_date,current_date)",
+          [],
+          /not_authorized/,
+        );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.admin_receipt_report(date,date)','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      const empty = (
+        await asUser(
+          admin,
+          "select public.admin_receipt_report('2000-01-01','2000-01-01') d",
+        )
+      ).rows[0].d;
+      assert.equal(empty.count, 0);
+      assert.equal(empty.amount_piasters, "0");
+      assert.deepEqual(empty.rows, []);
+      const one = (
+        await asUser(
+          admin,
+          "select public.admin_receipt_report('2026-01-01','2026-01-01') d",
+        )
+      ).rows[0].d;
+      const two = (
+        await asUser(
+          admin,
+          "select public.admin_receipt_report('2026-01-02','2026-01-02') d",
+        )
+      ).rows[0].d;
+      assert.equal(one.count, 1);
+      assert.equal(two.count, 1);
+      assert.notEqual(one.rows[0].receipt_id, two.rows[0].receipt_id);
+      await deny(
+        admin,
+        "select public.admin_receipt_report('2026-01-02','2026-01-01')",
+        [],
+        /invalid_reporting_period/,
+      );
+      await deny(
+        admin,
+        "select public.admin_receipt_report('2026-01-01','2027-01-02')",
+        [],
+        /invalid_reporting_period/,
+      );
+    },
+  );
+  await check(
+    "receipt export refuses over 5000 rows rather than silently truncating",
+    async () => {
+      await client.query("begin");
+      try {
+        await client.query(
+          "insert into public.payments(request_id,booking_id,amount_piasters,method,kind,recorded_by) select gen_random_uuid(),(select id from public.bookings limit 1),1,'report fixture','payment',$1 from generate_series(1,5001)",
+          [admin],
+        );
+        await client.query("set local role authenticated");
+        await client.query(
+          "select set_config('request.jwt.claim.sub',$1,true)",
+          [admin],
+        );
+        await assert.rejects(
+          () =>
+            client.query(
+              "select public.admin_receipt_report((now() at time zone 'Africa/Cairo')::date,(now() at time zone 'Africa/Cairo')::date)",
+            ),
+          /report_too_large_narrow_period/,
+        );
+      } finally {
+        await client.query("rollback");
+      }
+    },
+  );
+  await check(
     "explicit demo seed uses verified actors, is repeat-safe and reconciles synthetic totals",
     async () => {
       const seed = await fs.readFile(

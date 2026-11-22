@@ -123,7 +123,11 @@ export default async function BookingDetails({
   const customer = Array.isArray(b.customers) ? b.customers[0] : b.customers;
   return (
     <StaffFrame
-      title={bookingNumber(b.id) ? `حجز ${bookingNumber(b.id)}` : `حجز ${dress?.name ?? ""}`}
+      title={
+        bookingNumber(b.id)
+          ? `حجز ${bookingNumber(b.id)}`
+          : `حجز ${dress?.name ?? ""}`
+      }
       description="تفاصيل الحجز وسجل الدفعات."
       name={profile.full_name}
       role={profile.role}
@@ -137,13 +141,21 @@ export default async function BookingDetails({
               href={`/workspace/customers/${b.customer_id}`}
               className="underline underline-offset-4"
             >
-              {bookingNumber(b.id) ? `عملية ${bookingNumber(b.id)}` : customer?.full_name ?? "غير متاح"}
+              {bookingNumber(b.id)
+                ? `عملية ${bookingNumber(b.id)}`
+                : (customer?.full_name ?? "غير متاح")}
             </Link>
           ) : (
-            <p>{bookingNumber(b.id) ? `عملية ${bookingNumber(b.id)}` : customer?.full_name ?? "غير متاح"}</p>
+            <p>
+              {bookingNumber(b.id)
+                ? `عملية ${bookingNumber(b.id)}`
+                : (customer?.full_name ?? "غير متاح")}
+            </p>
           )}
           <p dir="ltr" className="mt-3 text-right">
-            {customer?.phone}
+            {bookingNumber(b.id) && /^0{10}[1-5]$/.test(customer?.phone ?? "")
+              ? null
+              : customer?.phone}
           </p>
         </div>
         <div>
@@ -259,7 +271,6 @@ export default async function BookingDetails({
           cancellation={cancellation}
         />
       )}
-
     </StaffFrame>
   );
 }

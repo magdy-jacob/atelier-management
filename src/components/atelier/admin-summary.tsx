@@ -112,7 +112,7 @@ export function AdminSummary({
           ))}
         </div>
       </section>
-      
+
     </div>
   );
 }

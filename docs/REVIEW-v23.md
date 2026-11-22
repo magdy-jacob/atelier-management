@@ -11,4 +11,4 @@ Migration22 is additive. On the existing test project it was applied once with g
 
 Historical backup remains Nov22 17:33:45 Cairo/schema20. It does not include later user edits or release23 ranges. Recovery route: restore/verify20, then21 and22. No new live backup was captured.
 
-Checks:56 unit,260 database checks, typecheck, lint, optimized build, browser regressions and isolated backup/recovery. Hosted role acceptance evidence is reported separately after deployment.
+Checks:56 unit,260 database checks, typecheck, lint, optimized build, browser regressions and isolated backup/recovery. All29 Chrome regressions pass in the functional build. Hosted role acceptance evidence is reported separately after deployment. Production domain was changed by the owner to https://atelier-lovely.vercel.app/; the prior domain no longer resolves.

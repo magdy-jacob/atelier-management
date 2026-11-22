@@ -30,7 +30,7 @@ export function DressHistory({
       <p className="text-xs leading-8 text-muted-foreground">
         آخر ١٠ حدث مرتبط مباشرة بمعرف الفستان أو بياناته السابقة/الجديدة.
         تفاصيل المبالغ وأسباب تعديل كل حجز داخل سجله؛ هذه القائمة ليست كل النشاط
-        المالي. 
+        المالي.
       </p>
       <AuditTable logs={logs} names={names} />
     </section>

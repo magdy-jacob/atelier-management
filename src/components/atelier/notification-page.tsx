@@ -63,7 +63,7 @@ export async function NotificationsPage({
       active="/workspace/notifications"
     >
       <NotificationTabs filter={filter} />
-      
+
       {parsed?.success ? (
         <NotificationList
           items={parsed.data.items}

@@ -91,7 +91,7 @@ export function OperationsBoard({
           الشهر الحالي
         </Link>
       </div>
-      
+
       {truncated && (
         <p
           role="alert"

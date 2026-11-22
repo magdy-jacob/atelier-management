@@ -1,4 +1,5 @@
 "use client";
+import { LateFeeForm } from "./late-fee-form";
 import Link from "next/link";
 import { useActionState } from "react";
 import { markNotificationRead, type ActionState } from "@/app/actions";
@@ -11,9 +12,11 @@ import { Button } from "@/components/ui/button";
 function NotificationItem({
   item,
   preview,
+  mutationsEnabled,
 }: {
   item: OperationalNotification;
   preview: boolean;
+  mutationsEnabled: boolean;
 }) {
   const [state, action, pending] = useActionState(
     markNotificationRead,
@@ -92,6 +95,13 @@ function NotificationItem({
               : "تعليم كمقروء"}
         </Button>
       </form>
+      {item.kind === "overdue" && (
+        <LateFeeForm
+          bookingId={item.booking_id}
+          enabled={mutationsEnabled}
+          preview={preview}
+        />
+      )}
     </article>
   );
 }
@@ -99,10 +109,12 @@ export function NotificationList({
   items,
   total,
   preview = false,
+  mutationsEnabled = false,
 }: {
   items: OperationalNotification[];
   total: number;
   preview?: boolean;
+  mutationsEnabled?: boolean;
 }) {
   return (
     <div className="space-y-5">
@@ -121,6 +133,7 @@ export function NotificationList({
             key={`${item.kind}:${item.booking_id}:${item.event_on}`}
             item={item}
             preview={preview}
+            mutationsEnabled={mutationsEnabled}
           />
         ))
       ) : (

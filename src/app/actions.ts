@@ -460,3 +460,59 @@ export async function markNotificationRead(
     revalidatePath(path);
   return { success: "تم التعليم كمقروء. يظل التنبيه ظاهرًا حتى معالجة سببه." };
 }
+
+export async function addManualLateFee(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "إضافة الغرامة للأدمن فقط." };
+  if (prototypeEnabled())
+    return { error: "الإضافة المالية معطلة في نسخة الاختبار." };
+  const parsed = z
+    .object({
+      request_id: z.uuid(),
+      booking_id: z.uuid(),
+      reason: z.string().trim().min(1).max(500),
+      confirm: z.literal("on"),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: "راجع سبب الغرامة وتأكيد إضافتها." };
+  const { toPiasters } = await import("@/lib/domain");
+  let amount: number;
+  try {
+    amount = toPiasters(String(form.get("amount")));
+  } catch {
+    return { error: "اكتب مبلغًا موجبًا بحد أقصى خانتين عشريتين." };
+  }
+  if (amount <= 0)
+    return {
+      error: "مبلغ الغرامة أكبر من صفر؛ لا تُضف غرامة إن لم تكن مطلوبة.",
+    };
+  const d = parsed.data;
+  const { error } = await db.rpc("add_late_fee", {
+    p_request_id: d.request_id,
+    p_booking_id: d.booking_id,
+    p_amount: amount,
+    p_reason: d.reason,
+  });
+  if (error)
+    return {
+      error: error.message.includes("request_id_payload_mismatch")
+        ? "نفس الطلب مسجل بقيم مختلفة. راجع سجل الحجز قبل إضافة أي مبلغ آخر."
+        : error.message.includes("currently_overdue")
+          ? "الحجز لم يعد مسجلًا كمتأخر خارج الأتيليه. حدّث الحالة أولًا."
+          : "تعذر تأكيد الغرامة. راجع السجل وأعد نفس المحاولة، ولا تضف مبلغًا ثانيًا قبل التحقق.",
+    };
+  for (const path of [
+    "/workspace/notifications",
+    "/workspace/notifications/overdue",
+    "/workspace/dashboard",
+    `/workspace/bookings/${d.booking_id}`,
+  ])
+    revalidatePath(path);
+  return {
+    success:
+      "أضيفت الغرامة الاختيارية إلى المستحق فقط. لم تُسجّل كدفعة ولم يُحصّل مال إلكترونيًا.",
+  };
+}

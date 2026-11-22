@@ -1,3 +1,4 @@
+import { getBookingConfig, bookingConfigReady } from "@/lib/booking-config";
 import Link from "next/link";
 import { requireStaff } from "@/lib/supabase/auth";
 import { StaffFrame, AdminOnly, Unavailable } from "./staff-frame";
@@ -48,6 +49,7 @@ export async function NotificationsPage({
         <AdminOnly />
       </StaffFrame>
     );
+  const config = await getBookingConfig(db);
   const { data, error } = await db.rpc("get_admin_notifications", {
     p_kind: filter ?? null,
   });
@@ -68,7 +70,11 @@ export async function NotificationsPage({
         اليوم والحالات.
       </p>
       {parsed?.success ? (
-        <NotificationList items={parsed.data.items} total={parsed.data.total} />
+        <NotificationList
+          items={parsed.data.items}
+          total={parsed.data.total}
+          mutationsEnabled={bookingConfigReady(config)}
+        />
       ) : (
         <Unavailable />
       )}

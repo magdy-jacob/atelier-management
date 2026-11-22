@@ -1,3 +1,4 @@
+import { money } from "@/lib/domain";
 import { getBookingConfig, bookingConfigReady } from "@/lib/booking-config";
 import { LivePaymentForm } from "@/components/atelier/live-booking-forms";
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export default async function BookingDetails({
   return (
     <StaffFrame
       title={`حجز ${dress?.name ?? ""}`}
-      description="عرض للبيانات المسجلة فقط. التعديل والتحصيل والتسليم والعودة والاسترداد لا تزال معطلة حتى استكمال السياسات والربط."
+      description="تفاصيل الحجز وسجل مبالغه المستلمة والمستحقة ضمن صلاحيات الحساب. لا تحصيل إلكتروني. التسليم والعودة والإلغاء والاسترداد لم تُفعّل بعد."
       name={profile.full_name}
       role={profile.role}
       active="/workspace"
@@ -103,7 +104,7 @@ export default async function BookingDetails({
               <h2 className="mb-4 text-sm">تفاصيل الغرامات المسجلة</h2>
               {fees.map((f) => (
                 <p key={f.id} className="py-2 text-xs leading-7">
-                  {f.reason}
+                  {money(Number(f.amount_piasters))} · {f.reason}
                 </p>
               ))}
             </section>

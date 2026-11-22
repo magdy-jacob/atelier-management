@@ -346,3 +346,70 @@ test("notification center keeps read operational causes visible and filters type
   await page.goto("/workspace/notifications");
   await expect(page).toHaveURL(/login/);
 });
+
+test("overdue fee is optional, explicit and disabled in prototype preview", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/notifications/overdue");
+  await page
+    .locator("summary")
+    .filter({ hasText: "إضافة غرامة تأخير" })
+    .click();
+  await page.getByLabel("مبلغ الغرامة (جنيه)").fill("50.25");
+  await page.getByLabel("سبب الغرامة").fill("سبب تجريبي اختياري");
+  await page.getByRole("checkbox").check();
+  await expect(
+    page.getByRole("button", { name: "إضافة الغرامة للمستحق", exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByText(/ولا يخصم أموالًا/)).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect
+    .poll(async () =>
+      Math.round(
+        (await page
+          .getByRole("note", { name: "نسخة اختبار فقط" })
+          .boundingBox())!.y,
+      ),
+    )
+    .toBe(0);
+  await page.screenshot({
+    path: "evidence/late-fee-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/notifications/overdue");
+  await page
+    .locator("summary")
+    .filter({ hasText: "إضافة غرامة تأخير" })
+    .click();
+  await page.getByLabel("مبلغ الغرامة (جنيه)").fill("50.25");
+  await page.getByLabel("سبب الغرامة").fill("سبب تجريبي اختياري");
+  await page.getByRole("checkbox").check();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect
+    .poll(async () =>
+      Math.round(
+        (await page
+          .getByRole("note", { name: "نسخة اختبار فقط" })
+          .boundingBox())!.y,
+      ),
+    )
+    .toBe(0);
+  await page.screenshot({
+    path: "evidence/late-fee-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/demo/notifications/incoming");
+  await expect(
+    page.getByRole("button", { name: "إضافة الغرامة للمستحق", exact: true }),
+  ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

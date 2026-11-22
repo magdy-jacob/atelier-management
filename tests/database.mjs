@@ -422,7 +422,7 @@ try {
       [dress],
     );
   });
-  async function parallelAsEmployee(sql, parameters) {
+  async function parallelAsUser(sql, parameters, uid = employee) {
     const clients = parameters.map(() => cluster.getPgClient());
     try {
       await Promise.all(clients.map((c) => c.connect()));
@@ -433,7 +433,7 @@ try {
             await c.query("set local role authenticated");
             await c.query(
               "select set_config('request.jwt.claim.sub',$1,true)",
-              [employee],
+              [uid],
             );
             const value = await c.query(sql, parameters[i]);
             await c.query("commit");
@@ -452,7 +452,7 @@ try {
   await check(
     "concurrent overlapping bookings yield exactly one winner",
     async () => {
-      const result = await parallelAsEmployee(
+      const result = await parallelAsUser(
         "select public.create_booking(gen_random_uuid(),$1,'Concurrent customer','01000000000','2100-01-05','2100-01-06',300000,0,null) as id",
         [[dress], [dress]],
       );
@@ -463,7 +463,7 @@ try {
     },
   );
   await check("concurrent payments cannot jointly overpay", async () => {
-    const result = await parallelAsEmployee(
+    const result = await parallelAsUser(
       "select public.record_payment(gen_random_uuid(),$1,200000,'cash')",
       [[raceBooking], [raceBooking]],
     );
@@ -779,6 +779,175 @@ try {
       d = (await asUser(admin, "select public.get_admin_notifications() as d"))
         .rows[0].d;
       assert.equal(d.total, 2);
+    },
+  );
+  await check(
+    "manual overdue fee is gated, admin-only and never a receipt",
+    async () => {
+      const late = (
+        await asUser(
+          admin,
+          "select public.get_admin_notifications('overdue') as d",
+        )
+      ).rows[0].d.items[0];
+      const incoming = (
+        await asUser(
+          admin,
+          "select public.get_admin_notifications('incoming') as d",
+        )
+      ).rows[0].d.items[0];
+      const request = "77777777-7777-4777-8777-777777777777";
+      const args = [
+        request,
+        late.booking_id,
+        1234,
+        "Local optional late-fee test",
+      ];
+      await deny(
+        admin,
+        "select public.add_late_fee($1,$2,$3,$4)",
+        args,
+        /policy_decisions_pending/,
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=true where id=true",
+      );
+      await deny(
+        employee,
+        "select public.add_late_fee($1,$2,$3,$4)",
+        args,
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "insert into public.late_fees(booking_id,amount_piasters,reason,recorded_by) values($1,1234,'Direct insert',$2)",
+        [late.booking_id, admin],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "select public.add_late_fee($1,$2,$3,$4)",
+        [request, incoming.booking_id, 1234, "Not late"],
+        /booking_not_currently_overdue/,
+      );
+      await deny(
+        admin,
+        "select public.add_late_fee($1,$2,$3,$4)",
+        [request, late.booking_id, 0, "Zero fee"],
+        /invalid_fee/,
+      );
+      await deny(
+        admin,
+        "select public.add_late_fee($1,$2,$3,$4)",
+        [null, late.booking_id, 1234, "No request"],
+        /invalid_fee/,
+      );
+      const before = (
+        await client.query(
+          "select sum(amount_piasters)::text total,count(*)::int n from public.payments",
+        )
+      ).rows[0];
+      const fee = (
+        await asUser(
+          admin,
+          "select public.add_late_fee($1,$2,$3,$4) as id",
+          args,
+        )
+      ).rows[0].id;
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.add_late_fee($1,$2,$3,$4) as id",
+            args,
+          )
+        ).rows[0].id,
+        fee,
+      );
+      await deny(
+        admin,
+        "select public.add_late_fee($1,$2,$3,$4)",
+        [request, late.booking_id, 1235, args[3]],
+        /request_id_payload_mismatch/,
+      );
+      assert.deepEqual(
+        (
+          await client.query(
+            "select sum(amount_piasters)::text total,count(*)::int n from public.payments",
+          )
+        ).rows[0],
+        before,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select count(*)::int n from public.late_fees where request_id=$1",
+            [request],
+          )
+        ).rows[0].n,
+        1,
+      );
+      const summary = (
+        await asUser(
+          admin,
+          "select public.admin_dashboard((now() at time zone 'Africa/Cairo')::date-30,(now() at time zone 'Africa/Cairo')::date) as d",
+        )
+      ).rows[0].d;
+      assert.equal(summary.outstanding_piasters, "556234");
+      assert.equal(summary.receipt_piasters, "1100000");
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.add_late_fee(uuid,uuid,bigint,text)','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      const raceArgs = [
+        "88888888-8888-4888-8888-888888888888",
+        late.booking_id,
+        1111,
+        "Concurrent exact retry",
+      ];
+      const repeated = await parallelAsUser(
+        "select public.add_late_fee($1,$2,$3,$4) as id",
+        [raceArgs, raceArgs],
+        admin,
+      );
+      assert.equal(repeated.filter((r) => r.ok).length, 2);
+      assert.equal(repeated[0].value.rows[0].id, repeated[1].value.rows[0].id);
+      assert.equal(
+        (
+          await client.query(
+            "select count(*)::int n from public.late_fees where request_id=$1",
+            [raceArgs[0]],
+          )
+        ).rows[0].n,
+        1,
+      );
+      await client.query(
+        "update public.bookings set status='returned' where id=$1",
+        [late.booking_id],
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.add_late_fee($1,$2,$3,$4) as id",
+            args,
+          )
+        ).rows[0].id,
+        fee,
+      );
+      await deny(
+        admin,
+        "select public.add_late_fee(gen_random_uuid(),$1,100,'Not active')",
+        [late.booking_id],
+        /booking_not_currently_overdue/,
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=false where id=true",
+      );
     },
   );
   await check("deactivation removes staff access immediately", async () => {

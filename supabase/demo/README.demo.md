@@ -1,6 +1,6 @@
 # Synthetic review dataset
 
-These are invented test records and generated product images, not real stock, people, receipts, debt or fees. Do not use this seed for commercial operation. Keep `ATELIER_PROTOTYPE_MODE=true` at build/runtime, the database booking gate false, and all deployment URLs protected.
+These are invented test records and generated product images, not real stock, people, receipts, debt or fees. This is a non-commercial CV/portfolio project on free plans. Keep `ATELIER_PROTOTYPE_MODE=true` at build/runtime and preserve the existing deployment audience. Initial seeding requires the database booking gate OFF. After migrations14/15 and acceptance, functional synthetic mode can be enabled by the matching application/database settings described in the root README. Do not re-run initial seeding to reset a growing functional-test dataset.
 
 The owner requested dummy data and pictures for review. The seed is an explicit setup action, not a migration or auto-start task. It creates six labelled dresses, three labelled categories, five dummy customers/bookings, five fictitious receipt entries and one fictitious fee. Employee-assigned fixtures remain RLS-scoped. Relative dates use the actual Cairo day: tomorrow preparation, today incoming, overdue return and future/history examples. No real contact route is used. No Auth user or password is created.
 
@@ -10,3 +10,6 @@ The owner requested dummy data and pictures for review. The seed is an explicit 
 4. Re-read row counts and the disabled gate, check customer/booking labels, public catalogue image rendering and RLS. The expected seeded full dataset has six dresses, five customers, five bookings, five receipts, EGP 11,000 fictitious recorded receipts, EGP 50 fictitious fees and EGP 5,550 current outstanding. These are validation numbers only, never actual business figures. Date-period totals depend on the selected range.
 
 Do not silently clear unrelated records to make a guard pass. Ask the owner or return the conflict. Never run blanket cleanup on a project that may contain non-demo work. Back up and target known fixture IDs if the owner later asks to remove this dataset.
+
+
+Migration14 registers the five known review customer/booking IDs as synthetic without rewriting their existing labels, amounts or dates. The seed also registers them for a fresh setup where migrations ran before seeding. Both must be applied in order; the amended seed now requires all fifteen migrations. New records in functional mode use an explicit `اختبار ` name and a non-contact `TEST-` identifier instead of a real telephone. `/workspace/portfolio` creates separate current-day scenarios without modifying this retained set. Its fabricated prior dates/guarantee flags/receipt entries are labelled fixtures, never claims that actual customers, guarantees or money were handled.

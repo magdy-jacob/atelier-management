@@ -1,58 +1,40 @@
-# Verification record
+# Verification record, 0.16.1
 
-Checked on 22 November 2026. This record applies to the source archive's local verification checkpoint, not to a hosted production service.
+Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
 
-## Passed
+## Current passed checks
 
-- `npm run lint`: no ESLint errors or warnings.
-- `npm run typecheck`: TypeScript passes.
-- `npm test`: 31 domain/image/timezone/operations/aggregate/prototype/workflow/report/cleanup tests pass.
-- `npm run test:db`: 118 checks pass against a temporary real local PostgreSQL instance. Auth and Storage schemas are local substitutes, not live Supabase services.
-- `npm run build`: optimized Next.js build passes.
-- `npm run test:e2e`: 16 browser scenarios pass in Chrome, covering desktop/mobile, filters, dress details, no public price, demo role presentation, overlap rejection, first available date, accepted local simulation, calendar, disabled login before configuration and a closed unconfigured workspace.
-- Dependency audit: no known vulnerabilities reported at verification time, after overriding the CLI's vulnerable transitive minimatch version. The lockfile records the tested graph. An audit is not a guarantee of application security.
+- ESLint and TypeScript: pass.
+- 34 unit tests: pass.
+- 142 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
+- Optimized Next.js builds with functional portfolio flag off and on: pass.
+- 17 Chrome browser scenarios in the flag-on build: pass. The default build's existing 16 scenarios and new portfolio scenario were also checked.
+- npm audit with production dependencies: zero reported vulnerabilities at this checkpoint. An audit is not a security guarantee.
 
-## Database checks include
+## Functional synthetic mode coverage
 
-- Anonymous users can select public catalogue fields, not customers.
-- Employees cannot read administrative dress prices or activity logs.
-- Employees cannot promote themselves or insert dresses.
-- Inactive staff cannot create bookings; deactivation removes booking visibility.
-- Live booking creation is blocked before policy configuration.
-- Booking, new customer and deposit are committed in one transaction.
-- A retried request does not duplicate a booking/deposit.
-- A rental ending December 6 rejects starts on December 6 and 7; December 8 is accepted.
-- A conflict rolls back the customer created in the failed transaction.
-- An employee not assigned to a booking cannot read its customer/payments or record a payment.
-- Direct payment insert/delete is denied to application tokens.
-- Overpayment and an overlong method note are rejected. Blank or custom method notes are permitted, as confirmed by the owner.
-- Exact remaining payment reaches the agreed total using integer piasters.
-- Even admin application tokens cannot directly delete the activity log.
+- Mode-off baseline remains closed. Application flags must agree with database configuration.
+- Invalid real-looking new customer names/phone values reject; matching test identifiers pass server and native browser validation.
+- Private registry tables cannot be edited by application roles. Unregistered records reject operational/financial changes in synthetic mode.
+- Ordinary same-day booking and pre-window handover still reject. A returned dress cannot be marked ready before its full preparation day.
+- Admin-only current-day scenario setup rejects an inactive assignee or invalid case, preserves original review-booking fingerprints, and exact retry returns one booking. Changed replay payload rejects.
+- Assigned employee can complete deposit handover, remaining receipt and balance-gated return; unrelated staff cannot see the case. A fully paid return case accepts multi-select maintenance. An overdue case appears in actual SQL notifications and accepts an optional admin fee, exact balance receipt and return.
+- These scenarios fabricate their labelled setup history explicitly. They do not weaken the normal booking RPC's advance rule or reset original review records.
+- An uncertain image-metadata response can recover a committed link. Unverified attachment retains the object rather than deleting a possibly linked image. This port-helper behavior is covered by unit tests; live transport-failure injection is not claimed.
 
-## Visual inspection
+## Pixels inspected
 
-Actual browser screenshots were inspected, not just generated:
+Actual rendered screenshots of the new scenario form on desktop/mobile and the synthetic booking form on mobile were inspected for RTL readability, labels, notice separation, spacing, logo/banner placement and overflow. Native TEST- contact validation was exercised in Chrome. The scenario preview remains clearly non-saving and its submit button disabled; the real protected page uses the same form with configuration-based enablement.
 
-- `evidence/catalogue-desktop.png`: catalogue hierarchy, type, filters and dress cards.
-- `evidence/catalogue-mobile.png`: stacked hero, two-column cards and responsive filter controls.
-- `evidence/dashboard-desktop.png`: sidebar, role selector, summary cards, operations and bookings.
-- `evidence/dashboard-mobile.png`: responsive cards without the desktop table's clipped columns.
-- `evidence/booking-conflict.png`: form labels and visible conflict/next-date feedback.
-- `evidence/calendar-desktop.png`: month alignment, occupied rental days and separate preparation days.
+Evidence: `evidence/portfolio-scenarios-desktop.png`, `portfolio-scenarios-mobile.png`, `portfolio-booking-mobile.png`. Existing catalogue/inventory/workflow/notification/report screenshots were refreshed by the suite. Tested viewport widths: 1440 and 390. No document-level mobile overflow in the automated scenarios.
 
-Desktop was tested at 1440x1000; mobile at 390x844. Full-page captures can be taller than the viewport. Automated checks found no document-level horizontal overflow at the tested mobile width.
+## Remaining verification and implementation
 
-## Not verified / not implemented
+Hosted authenticated creation/payment/handover/return/scenario feedback, actual employee sessions, vendor RLS/Storage and current deployment configuration are a separate acceptance step. No live setting or audience was changed by this local work. Do not present disabled preview clicks as hosted acceptance.
 
-- No live Supabase project, real hosted Auth flow or Storage operation was used.
-- No cloud deployment, public preview URL, domain or production environment was created.
-- No real users, clients, inventory, bookings or payments were entered.
-- Production booking/payment forms are wired but hosted integration remains unverified here. Employee account administration, handover, return inspection, cancellation, refund, real alerts, financial reports and operational export still need implementation.
-- Inventory edit/upload code has passed compile/local checks and its preview has been inspected, but no live Supabase Auth/Storage operation has been verified yet.
-- No production concurrency/load/security audit, backup restore drill or delivery monitoring has been completed.
-- Required business/legal decisions remain open, as listed in `DECISIONS.md`.
+Employee account management, booking editing/cancellation and receipt-timing adjustments, future-availability review, backup/restore and full integrated hosted acceptance remain open. No actual payout or refund exists. The previous review dataset and original image objects must stay intact. See `DECISIONS.md` for settled and open policy boundaries.
 
-The local tests validate the foundation within these bounds. They are not production acceptance or permission to operate the atelier using this build.
+## Historical local checkpoints
 
 ## Inventory update 0.2.0
 
@@ -147,3 +129,7 @@ Browser inventory scenario reorders three same-garment synthetic thumbnails loca
 The cleanup port tests cover uncertain delete transport followed by verified absence, existing-object/auth/read errors and completion failures retaining pending, and idempotent already-missing objects. Browser deletion scenario checks explicit independent confirmation, disabled synthetic preview delete/retry, cache/cleanup explanation and desktop/mobile overflow. Actual pixels were inspected after resetting viewport scroll, avoiding a full-page screenshot artifact that places the sticky test banner mid-document.
 
 Hosted acceptance must use a newly uploaded disposable object only. SQL rollback cannot restore an object deleted through Storage. Never remove one of the six persistent review image objects as a rollback test. Verify temporary object existence, queue removal, absence confirmation, completed state, retries, UI feedback and pending recovery; separately verify original dataset/fingerprints/object paths remain intact. No source migration creates a real pending job or deletes any current file.
+
+## Settings-boundary correction 0.16.1
+
+Independent review found that migration1 had retained app-admin settings INSERT/UPDATE grants and an all-command RLS policy. This could bypass the synthetic guard. Activation was held. Migration15 revokes all settings grants from public/anon/authenticated, grants authenticated SELECT only and replaces the admin all-command policy with SELECT-only RLS. Local configuration fixtures now use the actual test database owner. Regressions deny admin attempts to disable synthetic scope, alter the live gate/day policy, upsert or delete settings; deny employee writes; verify flags stay enabled; and independently challenge RLS with a temporary local UPDATE grant before restoring the final revoked state. The UI is unchanged, so the inspected v0.16 portfolio screenshots remain applicable. Do not activate the uncorrected v0.16.0 bundle.

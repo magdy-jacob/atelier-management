@@ -725,3 +725,65 @@ test("image removal preview requires separate confirmation, never deletes and ex
     ),
   ).toBeTruthy();
 });
+
+test("portfolio forms clearly distinguish preserved synthetic workflows from non-saving previews", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/portfolio");
+  await expect(
+    page.getByRole("heading", { name: "تجربة المشروع", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "السيناريو", exact: true })
+    .selectOption("overdue");
+  await page.getByRole("checkbox").check();
+  await expect(
+    page.getByRole("button", { name: "إنشاء سيناريو مصطنع" }),
+  ).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/portfolio-scenarios-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "evidence/portfolio-scenarios-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/demo/portfolio?view=booking");
+  const phone = page.locator('input[name="phone"]');
+  await expect(phone).toHaveValue("TEST-001");
+  await phone.fill("00000000000");
+  expect(
+    await phone.evaluate((e: HTMLInputElement) => e.checkValidity()),
+  ).toBeFalsy();
+  await phone.fill("TEST-a_b-c");
+  expect(
+    await phone.evaluate((e: HTMLInputElement) => e.checkValidity()),
+  ).toBeTruthy();
+  await expect(page.locator('input[name="customer"]')).toHaveValue(
+    "اختبار عميلة جديدة",
+  );
+  await expect(
+    page.getByRole("button", { name: "تأكيد الحجز والمقدم المسجل" }),
+  ).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/portfolio-booking-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
+  expect(errors).toEqual([]);
+});

@@ -31,6 +31,7 @@ export function StaffFrame({
           ["/workspace/customers", "العملاء"],
           ["/workspace/activity", "سجل النشاط"],
           ["/workspace/team", "الفريق"],
+          ["/workspace/portfolio", "تجربة المشروع"],
           ["/workspace/categories", "التصنيفات"],
         ]
       : []),
@@ -62,11 +63,13 @@ export function StaffFrame({
               key={href}
               href={
                 preview
-                  ? href === "/workspace/reports"
-                    ? "/demo/reports"
-                    : href === "/workspace/categories"
-                      ? "/demo/categories"
-                      : "/demo"
+                  ? href === "/workspace/portfolio"
+                    ? "/demo/portfolio"
+                    : href === "/workspace/reports"
+                      ? "/demo/reports"
+                      : href === "/workspace/categories"
+                        ? "/demo/categories"
+                        : "/demo"
                   : href
               }
               className={`rounded-full border px-4 py-2 text-xs ${active === href ? "border-primary bg-primary text-white" : "bg-white text-muted-foreground"}`}

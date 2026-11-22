@@ -1,9 +1,14 @@
 import { prototypeEnabled } from "./prototype";
+import {
+  functionalPortfolioEnabled,
+  portfolioWriteContext,
+} from "./portfolio-mode";
 import "server-only";
 import { z } from "zod";
 import type { supabaseServer } from "./supabase/server";
 const schema = z.object({
   live_bookings_enabled: z.boolean(),
+  synthetic_test_enabled: z.boolean().default(false),
   date_precision: z.string().nullable(),
   business_timezone: z.string().nullable(),
   same_day_allowed: z.boolean().nullable(),
@@ -22,7 +27,11 @@ export async function getBookingConfig(
 }
 export function bookingConfigReady(c: BookingConfig | null) {
   return !!(
-    !prototypeEnabled() &&
+    portfolioWriteContext({
+      prototype: prototypeEnabled(),
+      functional: functionalPortfolioEnabled(),
+      databaseSynthetic: c?.synthetic_test_enabled === true,
+    }) &&
     c?.live_bookings_enabled &&
     c.date_precision === "day" &&
     c.business_timezone === "Africa/Cairo" &&
@@ -33,4 +42,10 @@ export function bookingConfigReady(c: BookingConfig | null) {
 
 export function workflowReady(c: BookingConfig | null) {
   return bookingConfigReady(c) && c?.handover_return_ready === true;
+}
+
+export async function bookingMutationsAllowed(
+  db: Awaited<ReturnType<typeof supabaseServer>>,
+) {
+  return bookingConfigReady(await getBookingConfig(db));
 }

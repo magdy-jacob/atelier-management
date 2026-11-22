@@ -40,6 +40,7 @@ export default async function NewBooking() {
           enabled={bookingConfigReady(config) && !!minDay}
           requestId={crypto.randomUUID()}
           minDay={minDay}
+          synthetic={config?.synthetic_test_enabled === true}
         />
       )}
     </StaffFrame>

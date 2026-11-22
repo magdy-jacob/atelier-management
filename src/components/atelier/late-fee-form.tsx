@@ -55,7 +55,8 @@ export function LateFeeForm({
         </p>
         {!enabled && (
           <p className="rounded-xl border border-pink-200 bg-pink-50 p-3 text-xs leading-7">
-            الإضافة المالية معطلة في نسخة الاختبار. هذه الحقول للمراجعة فقط.
+            الحفظ غير متاح في المعاينة أو قبل اكتمال إعداد الاختبار الوظيفي. لا
+            تُرسل هذه الحقول عملية مالية.
           </p>
         )}
         <div className="grid gap-4 sm:grid-cols-2">

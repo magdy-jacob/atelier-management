@@ -6,6 +6,7 @@ import {
   ActionState,
 } from "@/app/actions";
 import { Button } from "@/components/ui/button";
+import { SYNTHETIC_PHONE_PATTERN } from "@/lib/booking-identity";
 import { money, toPiasters } from "@/lib/domain";
 function Feedback({ state }: { state: ActionState }) {
   return (
@@ -36,6 +37,7 @@ export function LiveBookingForm({
   requestId,
   minDay,
   preview = false,
+  synthetic = false,
 }: {
   dresses: { id: string; name: string; code: string }[];
   methods: string[];
@@ -43,6 +45,7 @@ export function LiveBookingForm({
   requestId: string;
   minDay?: string;
   preview?: boolean;
+  synthetic?: boolean;
 }) {
   const [state, action, pending] = useActionState(createRealBooking, {});
   const [total, setTotal] = useState("");
@@ -60,6 +63,13 @@ export function LiveBookingForm({
       className="studio-card space-y-6 p-6 md:p-8"
     >
       <input name="request_id" type="hidden" value={requestId} />
+      {synthetic && (
+        <p className="rounded-xl border bg-secondary p-4 text-xs leading-7">
+          اختبار وظيفي لمشروع معرض أعمال. تُحفظ السجلات المصطنعة في Supabase
+          وتعمل القواعد فعليًا، دون تحصيل أو التزام مالي أو عملاء حقيقيين. الهاتف
+          معرف اختبار يبدأ بـTEST- ولا يمكن الاتصال به.
+        </p>
+      )}
       {!enabled && (
         <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
           الحفظ الفعلي غير مفعل بعد. الحجز بالأيام بتوقيت مصر، وقبل الخروج بيوم
@@ -84,13 +94,26 @@ export function LiveBookingForm({
         </label>
         <label className="field">
           اسم العميل
-          <input name="customer" required maxLength={120} />
+          <input
+            name="customer"
+            required
+            maxLength={120}
+            defaultValue={synthetic ? "اختبار عميلة جديدة" : undefined}
+            pattern={synthetic ? "اختبار .+" : undefined}
+          />
+          {synthetic && (
+            <span className="text-[10px] leading-6">
+              اسم شخصية مصطنعة يبدأ بكلمة اختبار، لا اسم عميل حقيقي.
+            </span>
+          )}
         </label>
         <label className="field">
           رقم الهاتف
           <input
             name="phone"
-            type="tel"
+            type={synthetic ? "text" : "tel"}
+            defaultValue={synthetic ? "TEST-001" : undefined}
+            pattern={synthetic ? SYNTHETIC_PHONE_PATTERN : undefined}
             dir="ltr"
             required
             minLength={5}

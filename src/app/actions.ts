@@ -1,5 +1,12 @@
 "use server";
-import { prototypeEnabled } from "@/lib/prototype";
+import {
+  bookingMutationsAllowed,
+  getBookingConfig,
+  bookingConfigReady,
+} from "@/lib/booking-config";
+import { validBookingPhone, validSyntheticName } from "@/lib/booking-identity";
+import { imageAttachmentConfirmed } from "@/lib/image-attachment";
+import { functionalPortfolioEnabled } from "@/lib/portfolio-mode";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -230,16 +237,20 @@ export async function uploadDressImage(
     path,
     sort_order: (last?.[0]?.sort_order ?? -1) + 1,
   });
-  if (rowError) {
-    let cleanup = await db.storage.from("dress-images").remove([path]);
-    if (cleanup.error)
-      cleanup = await db.storage.from("dress-images").remove([path]);
+  if (
+    !(await imageAttachmentConfirmed(!!rowError, async () => {
+      const recovered = await db
+        .from("dress_images")
+        .select("id")
+        .eq("dress_id", id.data)
+        .eq("path", path)
+        .maybeSingle();
+      return !recovered.error && !!recovered.data;
+    }))
+  )
     return {
-      error: cleanup.error
-        ? `فشل ربط الصورة وتعذر حذف الملف المرفوع بعد محاولتين. على مسؤول Storage إزالة الملف غير المرتبط: ${path}`
-        : "تعذر ربط الصورة بالفستان، وتم التراجع عن الرفع. أعد المحاولة.",
+      error: `تعذر تأكيد ربط الصورة. لم نحذف الملف احتياطًا. أعد تحميل الفستان قبل رفع نسخة أخرى. مسار المتابعة للأدمن: ${path}`,
     };
-  }
   revalidatePath("/");
   revalidatePath(`/workspace/dresses/${id.data}`);
   revalidatePath(`/dresses/${id.data}`);
@@ -251,9 +262,11 @@ export async function createRealBooking(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
-  if (prototypeEnabled())
+  const config = await getBookingConfig(db);
+  if (!bookingConfigReady(config))
     return {
-      error: "هذه نسخة اختبار فقط. تسجيل الحجوزات والدفعات الفعلية معطل.",
+      error:
+        "إعداد الحفظ الوظيفي غير مكتمل أو تعذر التحقق منه. لم تُسجل العملية.",
     };
   const parsed = z
     .object({
@@ -265,15 +278,24 @@ export async function createRealBooking(
         .trim()
         .min(5)
         .max(24)
-        .regex(/^[+0-9 ()-]+$/)
-        .refine((v) => v.replace(/\D/g, "").length >= 5),
+        .refine((v) =>
+          validBookingPhone(v, config?.synthetic_test_enabled === true),
+        ),
       starts_on: z.string(),
       returns_on: z.string(),
       method: z.string().trim().max(40).default(""),
     })
     .safeParse(Object.fromEntries(form));
   if (!parsed.success)
-    return { error: "راجع الاسم والهاتف والفستان وباقي الحقول." };
+    return {
+      error:
+        "راجع الاسم والهاتف والفستان وباقي الحقول. في وضع المشروع استخدم معرف TEST- بدل هاتف حقيقي.",
+    };
+  if (
+    config?.synthetic_test_enabled &&
+    !validSyntheticName(parsed.data.customer)
+  )
+    return { error: "استخدم اسمًا مصطنعًا يبدأ بكلمة اختبار." };
   const { validDay, toPiasters, formatDay } = await import("@/lib/domain");
   if (
     !validDay(parsed.data.starts_on) ||
@@ -363,9 +385,10 @@ export async function recordRealPayment(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
-  if (prototypeEnabled())
+  if (!(await bookingMutationsAllowed(db)))
     return {
-      error: "هذه نسخة اختبار فقط. تسجيل الحجوزات والدفعات الفعلية معطل.",
+      error:
+        "إعداد الحفظ الوظيفي غير مكتمل أو تعذر التحقق منه. لم تُسجل العملية.",
     };
   const parsed = z
     .object({
@@ -469,8 +492,11 @@ export async function addManualLateFee(
 ): Promise<ActionState> {
   const { db, profile } = await requireStaff();
   if (profile.role !== "admin") return { error: "إضافة الغرامة للأدمن فقط." };
-  if (prototypeEnabled())
-    return { error: "الإضافة المالية معطلة في نسخة الاختبار." };
+  if (!(await bookingMutationsAllowed(db)))
+    return {
+      error:
+        "إعداد الحفظ الوظيفي غير مكتمل أو تعذر التحقق منه. لم تُسجل العملية.",
+    };
   const parsed = z
     .object({
       request_id: z.uuid(),
@@ -611,7 +637,11 @@ export async function recordBookingHandover(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
-  if (prototypeEnabled()) return { error: "التسليم معطل في نسخة الاختبار." };
+  if (!(await bookingMutationsAllowed(db)))
+    return {
+      error:
+        "إعداد الحفظ الوظيفي غير مكتمل أو تعذر التحقق منه. لم تُسجل العملية.",
+    };
   if (!(await workflowDayValid(form)))
     return {
       error: "تغير اليوم في مصر منذ فتح الشاشة. حدّث الصفحة قبل التسجيل.",
@@ -647,8 +677,11 @@ export async function recordBookingReturn(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
-  if (prototypeEnabled())
-    return { error: "تسجيل العودة معطل في نسخة الاختبار." };
+  if (!(await bookingMutationsAllowed(db)))
+    return {
+      error:
+        "إعداد الحفظ الوظيفي غير مكتمل أو تعذر التحقق منه. لم تُسجل العملية.",
+    };
   if (!(await workflowDayValid(form)))
     return {
       error: "تغير اليوم في مصر منذ فتح الشاشة. حدّث الصفحة قبل التسجيل.",
@@ -696,8 +729,11 @@ export async function confirmDressReady(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
-  if (prototypeEnabled())
-    return { error: "تغيير حالة الجاهزية معطل في نسخة الاختبار." };
+  if (!(await bookingMutationsAllowed(db)))
+    return {
+      error:
+        "إعداد الحفظ الوظيفي غير مكتمل أو تعذر التحقق منه. لم تُسجل العملية.",
+    };
   const parsed = z
     .object({
       booking_id: z.uuid(),
@@ -912,4 +948,55 @@ export async function retryImageCleanup(
       error: "تعذر التحقق من طلب التنظيف أو الصلاحيات. لم نمسح أي ملف.",
     };
   return runImageCleanup(db, data);
+}
+
+export async function createPortfolioScenario(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin")
+    return { error: "تجهيز السيناريوهات للأدمن فقط." };
+  const config = await getBookingConfig(db);
+  if (
+    !functionalPortfolioEnabled() ||
+    config?.synthetic_test_enabled !== true ||
+    !(await bookingMutationsAllowed(db))
+  )
+    return { error: "إعداد الاختبار الوظيفي غير مكتمل." };
+  const parsed = z
+    .object({
+      request_id: z.uuid(),
+      kind: z.enum(["handover", "return", "overdue"]),
+      assigned_to: z.union([z.uuid(), z.literal("")]),
+      confirm: z.literal("on"),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return { error: "اختر السيناريو والحساب وأكد أن البيانات مصطنعة." };
+  const { data, error } = await db.rpc("create_portfolio_scenario", {
+    p_request_id: parsed.data.request_id,
+    p_kind: parsed.data.kind,
+    p_assigned_to: parsed.data.assigned_to || null,
+  });
+  if (error || !z.uuid().safeParse(data).success)
+    return {
+      error:
+        "تعذر تأكيد إنشاء السيناريو. راجع الحجوزات ثم أعد نفس المحاولة دون تغيير القيم.",
+    };
+  for (const path of [
+    "/workspace/portfolio",
+    "/workspace",
+    "/workspace/bookings",
+    "/workspace/dashboard",
+    "/workspace/notifications",
+    "/workspace/operations",
+    "/workspace/reports",
+    "/",
+  ])
+    revalidatePath(path);
+  return {
+    success:
+      "تم إنشاء سيناريو مصطنع محفوظ. افتح الحجز من القائمة أدناه لتجربته.",
+  };
 }

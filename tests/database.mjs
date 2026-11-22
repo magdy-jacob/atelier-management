@@ -174,8 +174,8 @@ try {
     [dress],
     /policy_decisions_pending/,
   );
-  await asUser(
-    admin,
+  // Installation configuration belongs to the test database owner, not app admin.
+  await client.query(
     "update public.settings set live_bookings_enabled=true,date_precision='day',business_timezone='Africa/Cairo',same_day_allowed=false,payment_methods=array['cash'] where id=true",
   );
   const request = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -2031,6 +2031,361 @@ try {
         ).rows[0].allowed,
         false,
       );
+    },
+  );
+  await check(
+    "portfolio scenarios are explicit, admin-only, isolated, retry-safe and usable today",
+    async () => {
+      const sql = "select public.create_portfolio_scenario($1,$2,$3) id";
+      const req = "15151515-1515-4515-8515-151515151515";
+      await deny(
+        admin,
+        sql,
+        [req, "handover", employee],
+        /functional_portfolio_required/,
+      );
+      await deny(employee, sql, [req, "handover", employee], /not_authorized/);
+      const fingerprint = () =>
+        client.query(
+          "select jsonb_agg(to_jsonb(b) order by id)::text data from public.bookings b where id::text like 'b0000000-%'",
+        );
+      const before = (await fingerprint()).rows[0].data;
+      await client.query(
+        "update public.settings set synthetic_test_enabled=true,live_bookings_enabled=true where id=true",
+      );
+      try {
+        await deny(admin, sql, [req, "invalid", employee], /invalid_scenario/);
+        await deny(
+          admin,
+          sql,
+          [req, "handover", inactive],
+          /active_test_staff_required/,
+        );
+        const b = (await asUser(admin, sql, [req, "handover", employee]))
+          .rows[0].id;
+        assert.equal(
+          (await asUser(admin, sql, [req, "handover", employee])).rows[0].id,
+          b,
+        );
+        await deny(
+          admin,
+          sql,
+          [req, "return", employee],
+          /request_id_payload_mismatch/,
+        );
+        assert.equal(
+          (
+            await asUser(other, "select id from public.bookings where id=$1", [
+              b,
+            ])
+          ).rowCount,
+          0,
+        );
+        await asUser(
+          employee,
+          "select public.record_handover(gen_random_uuid(),$1,true,true)",
+          [b],
+        );
+        await asUser(
+          employee,
+          "select public.record_payment(gen_random_uuid(),$1,7500,null)",
+          [b],
+        );
+        await asUser(
+          employee,
+          "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+          [b],
+        );
+        const r = (
+          await asUser(admin, sql, [
+            "16161616-1616-4616-8616-161616161616",
+            "return",
+            employee,
+          ])
+        ).rows[0].id;
+        await asUser(
+          employee,
+          "select public.record_return(gen_random_uuid(),$1,true,'maintenance',array['zipper','sewing'])",
+          [r],
+        );
+        const overdue = (
+          await asUser(admin, sql, [
+            "17171717-1717-4717-8717-171717171717",
+            "overdue",
+            employee,
+          ])
+        ).rows[0].id;
+        assert.ok(
+          (
+            await asUser(
+              admin,
+              "select public.get_admin_notifications('overdue') data",
+            )
+          ).rows[0].data.items.some((x) => x.booking_id === overdue),
+        );
+        await deny(
+          employee,
+          "select public.add_late_fee(gen_random_uuid(),$1,100,'test')",
+          [overdue],
+          /not_authorized/,
+        );
+        await asUser(
+          admin,
+          "select public.add_late_fee(gen_random_uuid(),$1,100,'اختبار دون تحصيل')",
+          [overdue],
+        );
+        await asUser(
+          employee,
+          "select public.record_payment(gen_random_uuid(),$1,7600,null)",
+          [overdue],
+        );
+        await asUser(
+          employee,
+          "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+          [overdue],
+        );
+        assert.equal((await fingerprint()).rows[0].data, before);
+        assert.equal(
+          (
+            await asUser(
+              admin,
+              "select count(*)::int n from public.portfolio_scenarios",
+            )
+          ).rows[0].n,
+          3,
+        );
+        assert.equal(
+          (await asUser(other, "select * from public.portfolio_scenarios"))
+            .rowCount,
+          0,
+        );
+        await deny(
+          employee,
+          "insert into public.portfolio_scenarios select * from public.portfolio_scenarios limit 1",
+          [],
+          /permission denied/,
+        );
+      } finally {
+        await client.query(
+          "update public.settings set synthetic_test_enabled=false,live_bookings_enabled=false where id=true",
+        );
+      }
+    },
+  );
+  await check(
+    "functional portfolio enforces registered synthetic records while real workflow rules still work",
+    async () => {
+      const dress = "fafafafa-fafa-4afa-8afa-fafafafafafa";
+      await asUser(
+        admin,
+        "insert into public.dresses(id,code,name,color,size,category_id) select $1,'PORTFOLIO-TEST','Portfolio fixture','pink','M',id from public.categories limit 1",
+        [dress],
+      );
+      const unregistered = (
+        await client.query(
+          "insert into public.customers(full_name,phone) values('Unregistered local fixture','NO-CONTACT') returning id",
+        )
+      ).rows[0].id;
+      const blockedBooking = (
+        await client.query(
+          "insert into public.bookings(request_id,dress_id,customer_id,starts_on,returns_on,agreed_price_piasters,created_by) values(gen_random_uuid(),$1,$2,current_date+20,current_date+20,10000,$3) returning id",
+          [dress, unregistered, admin],
+        )
+      ).rows[0].id;
+      await client.query(
+        "update public.settings set synthetic_test_enabled=true,live_bookings_enabled=true where id=true",
+      );
+      try {
+        await check(
+          "application admin cannot disable synthetic enforcement or rewrite installation settings",
+          async () => {
+            for (const sql of [
+              "update public.settings set synthetic_test_enabled=false where id=true",
+              "update public.settings set live_bookings_enabled=false where id=true",
+              "update public.settings set same_day_allowed=true where id=true",
+              "insert into public.settings(id) values(true) on conflict(id) do update set synthetic_test_enabled=false",
+              "delete from public.settings where id=true",
+            ])
+              await deny(admin, sql, [], /permission denied/);
+            await deny(
+              employee,
+              "update public.settings set synthetic_test_enabled=false where id=true",
+              [],
+              /permission denied/,
+            );
+            const c = (
+              await asUser(admin, "select public.get_staff_booking_config() d")
+            ).rows[0].d;
+            assert.equal(c.synthetic_test_enabled, true);
+            assert.equal(c.live_bookings_enabled, true);
+            assert.equal(
+              (
+                await client.query(
+                  "select has_table_privilege('authenticated','public.settings','INSERT') or has_table_privilege('authenticated','public.settings','UPDATE') or has_table_privilege('authenticated','public.settings','DELETE') allowed",
+                )
+              ).rows[0].allowed,
+              false,
+            );
+            // Independently challenge SELECT-only RLS with a temporary local owner
+            // grant, then restore the final production grants immediately.
+            await client.query(
+              "grant update on public.settings to authenticated",
+            );
+            try {
+              assert.equal(
+                (
+                  await asUser(
+                    admin,
+                    "update public.settings set synthetic_test_enabled=false where id=true returning id",
+                  )
+                ).rowCount,
+                0,
+              );
+            } finally {
+              await client.query(
+                "revoke update on public.settings from authenticated",
+              );
+            }
+            assert.equal(
+              (
+                await asUser(
+                  admin,
+                  "select public.get_staff_booking_config() d",
+                )
+              ).rows[0].d.synthetic_test_enabled,
+              true,
+            );
+          },
+        );
+        assert.equal(
+          (await asUser(admin, "select public.get_staff_booking_config() d"))
+            .rows[0].d.synthetic_test_enabled,
+          true,
+        );
+        assert.equal(
+          (
+            await client.query(
+              "select count(*)::int n from public.synthetic_bookings where booking_id::text like 'b0000000-%'",
+            )
+          ).rows[0].n,
+          5,
+        );
+        await deny(
+          admin,
+          "select public.record_payment(gen_random_uuid(),$1,1,null)",
+          [blockedBooking],
+          /synthetic_booking_required/,
+        );
+        const sql =
+          "select public.create_booking($1,$2,$3,$4,(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+2,10000,2500,null) id";
+        await deny(
+          employee,
+          sql,
+          [
+            "12121212-1212-4212-8212-121212121212",
+            dress,
+            "Plain fixture",
+            "TEST-A",
+          ],
+          /synthetic_customer_required/,
+        );
+        await deny(
+          employee,
+          sql,
+          [
+            "13131313-1313-4313-8313-131313131313",
+            dress,
+            "اختبار عميلة",
+            "00000000000",
+          ],
+          /synthetic_customer_required/,
+        );
+        const request = "14141414-1414-4414-8414-141414141414";
+        const args = [request, dress, "اختبار عميلة", "TEST-PORTFOLIO"];
+        const b = (await asUser(employee, sql, args)).rows[0].id;
+        assert.equal((await asUser(employee, sql, args)).rows[0].id, b);
+        assert.equal(
+          (
+            await client.query(
+              "select count(*)::int n from public.synthetic_bookings where booking_id=$1",
+              [b],
+            )
+          ).rows[0].n,
+          1,
+        );
+        await deny(
+          other,
+          "select public.record_payment(gen_random_uuid(),$1,1,null)",
+          [b],
+          /not_authorized/,
+        );
+        await deny(
+          employee,
+          "select public.create_booking(gen_random_uuid(),$1,'اختبار اليوم','TEST-TODAY',(now() at time zone 'Africa/Cairo')::date,(now() at time zone 'Africa/Cairo')::date,10000,0,null)",
+          [dress],
+          /advance|past|day|date/i,
+        );
+        await deny(
+          employee,
+          "select public.record_handover(gen_random_uuid(),$1,true,true)",
+          [b],
+          /outside_planned_handover_days/,
+        );
+        // Owner-only local fixture moves this registered dummy to today's scenario.
+        await client.query(
+          "update public.bookings set starts_on=(now() at time zone 'Africa/Cairo')::date,returns_on=(now() at time zone 'Africa/Cairo')::date where id=$1",
+          [b],
+        );
+        await asUser(
+          employee,
+          "select public.record_handover(gen_random_uuid(),$1,true,true)",
+          [b],
+        );
+        await deny(
+          employee,
+          "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+          [b],
+          /outstanding_balance_before_return/,
+        );
+        await asUser(
+          employee,
+          "select public.record_payment(gen_random_uuid(),$1,7500,null)",
+          [b],
+        );
+        await asUser(
+          employee,
+          "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+          [b],
+        );
+        assert.equal(
+          (
+            await asUser(
+              employee,
+              "select status from public.bookings where id=$1",
+              [b],
+            )
+          ).rows[0].status,
+          "returned",
+        );
+        await deny(
+          employee,
+          "select public.set_dress_operation($1,'in_atelier')",
+          [dress],
+          /preparation_day_not_finished/,
+        );
+        assert.equal(
+          (
+            await client.query(
+              "select has_table_privilege('authenticated','public.synthetic_bookings','INSERT') allowed",
+            )
+          ).rows[0].allowed,
+          false,
+        );
+      } finally {
+        await client.query(
+          "update public.settings set synthetic_test_enabled=false,live_bookings_enabled=false where id=true",
+        );
+      }
     },
   );
   await check("deactivation removes staff access immediately", async () => {

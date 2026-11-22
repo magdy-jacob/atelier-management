@@ -345,7 +345,8 @@ export function BookingWorkflow({
       </p>
       {!enabled && (
         <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
-          الحفظ التشغيلي معطل في هذه النسخة الاختبارية. الحقول للمراجعة فقط.
+          الحفظ غير متاح في المعاينة أو قبل اكتمال إعداد الاختبار الوظيفي.
+          الحقول للمراجعة فقط.
         </p>
       )}
       {success && (

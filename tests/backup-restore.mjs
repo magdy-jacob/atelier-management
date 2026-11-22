@@ -3,10 +3,11 @@
 // pg_dump/pg_restore/psql whose major version is >= the embedded server's
 // (PostgreSQL 18): put their bin directory on PATH or pass PGBIN=/path/to/bin.
 //
-// Uses three temporary local PostgreSQL instances:
+// Uses four temporary local PostgreSQL instances:
 //   A: stub vendor schemas + all migrations + representative fixture rows (the "source project")
 //   B: stub + all migrations, then DATA-ONLY pg_restore from A's dump (recommended path: repo holds schema)
 //   C: fresh migration-built target for the named Studio-profile archive
+//   D: historical20backup restored at20, then upgraded to21
 // The backup is ONE custom-format pg_dump (single consistent snapshot).
 // The migration-based restore reads that exact file. Original Auth UUIDs are preserved by
 // the supported Admin API payload helper using a LOCAL provider adapter.
@@ -87,9 +88,9 @@ async function makeCluster(port) {
   return { cluster, client, url: `postgresql://postgres:${PASSWORD}@127.0.0.1:${port}/postgres` };
 }
 
-async function applyMigrations(client) {
+async function applyMigrations(client,maxVersion=21) {
   const dir = await fs.readdir(MIGRATIONS_DIR);
-  for (const file of dir.filter((f) => f.endsWith(".sql")).sort()) {
+  for (const file of dir.filter((f) => f.endsWith(".sql") && Number(f.slice(8,12))<=maxVersion).sort()) {
     await client.query(await fs.readFile(path.join(MIGRATIONS_DIR, file), "utf8"));
   }
 }
@@ -206,7 +207,7 @@ try {
 
   await A.client.query("insert into storage.objects(bucket_id,name,metadata) values('dress-images','prototype-demo/backup/main.webp','{\"size\":7}'),('dress-images','paths.txt','{\"size\":7}')");
   // Signature fixture is generated ONLY by this explicit local test switch,
-  // never by backup capture. The distributed fixture is pinned to 20 migrations.
+  // never by backup capture. The distributed fixture is pinned to 21 migrations.
   if(process.env.REGENERATE_BACKUP_SCHEMA==='1') {
     const modulePath=fileURLToPath(new URL('../scripts/backup-atelier.py',import.meta.url));
     const getSQL="import importlib.util,sys; s=importlib.util.spec_from_file_location('m',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(m.SIGNATURE_SQL)";
@@ -219,7 +220,7 @@ try {
     await A.client.query('rollback');
     const crypto=await import('node:crypto'); const source_migrations={};
     for(const f of (await fs.readdir(MIGRATIONS_DIR)).filter(f=>f.endsWith('.sql')).sort()) source_migrations[f]=crypto.createHash('sha256').update(await fs.readFile(path.join(MIGRATIONS_DIR,f))).digest('hex');
-    await fs.writeFile(fileURLToPath(new URL('../scripts/backup-schema-v20.json',import.meta.url)),JSON.stringify({signature,source_migrations,provider_function,provider_source:'https://raw.githubusercontent.com/supabase/supabase/master/apps/studio/components/interfaces/Database/Triggers/EventTriggersList/EventTriggers.constants.ts'},null,2)+'\n');
+    await fs.writeFile(fileURLToPath(new URL('../scripts/backup-schema-v21.json',import.meta.url)),JSON.stringify({signature,source_migrations,provider_function,provider_source:'https://raw.githubusercontent.com/supabase/supabase/master/apps/studio/components/interfaces/Database/Triggers/EventTriggersList/EventTriggers.constants.ts'},null,2)+'\n');
   }
   const canonicalModule=fileURLToPath(new URL('../scripts/backup_canonical.py',import.meta.url));
   execFileSync('python3',['-c',`import importlib.util,sys
@@ -237,6 +238,13 @@ spec=importlib.util.spec_from_file_location('backup',sys.argv[1]);m=importlib.ut
 m.download=lambda base,name: b'FAKEIMG'
 sys.argv=['backup','--quiescent','--output',sys.argv[2]]
 m.main()`;
+  const oldDashboard=(await fs.readFile(path.join(MIGRATIONS_DIR,'202611220005_admin_dashboard.sql'),'utf8')).replace('create function public.admin_dashboard','create or replace function public.admin_dashboard');
+  const migration21=await fs.readFile(path.join(MIGRATIONS_DIR,'202611220021_daily_dashboard_completion.sql'),'utf8');
+  await A.client.query(oldDashboard);
+  const historicRoot=await fs.mkdtemp(path.join(os.tmpdir(),'atelier-historic20-'));
+  const historicAdapter=pythonAdapter.replace("'--quiescent','--output'","'--quiescent','--schema-version','20','--output'");
+  execFileSync('python3',['-c',historicAdapter,capturePy,historicRoot],{env:{...toolEnv,SUPABASE_DB_URL:A.url,SUPABASE_PROJECT_URL:'https://isolatedtest.supabase.co'},stdio:'inherit'});
+  await A.client.query(migration21);
   execFileSync('python3',['-c',pythonAdapter,capturePy,root],{env:{...toolEnv,SUPABASE_DB_URL:A.url,SUPABASE_PROJECT_URL:'https://isolatedtest.supabase.co'},stdio:'inherit'});
   const entries=await fs.readdir(root);assert.equal(entries.length,1);
   const manifest=JSON.parse(await fs.readFile(path.join(root,entries[0],'manifest.json'),'utf8'));
@@ -336,6 +344,32 @@ m.main()`;
   for(const t of tableNames) assert.equal(await tableHash(C.client,t),await tableHash(A.client,t),t);
   const providerCat=await catalogCounts(C.client);assert.equal(providerCat.functions,'40');
   console.log('PASS actual Studio-profile archive round-trip:24 tables identical plus reviewed provider function/event configuration');
+
+  // Historical20backup is NOT relabelled21: reconstruct20, restore20,
+  // validate20data, then apply21once. No new live capture window is needed.
+  const D=await makeCluster(55444);clusters.push(D);
+  await D.client.query(STUB_SQL);await restoreAuth(A.client,D.client);await applyMigrations(D.client,20);
+  execFileSync(psqlBin,['--single-transaction','--variable','ON_ERROR_STOP=1','--dbname',D.url,'--command',TRUNCATE_PUBLIC],{env:toolEnv,stdio:'inherit'});
+  const historicEntries=await fs.readdir(historicRoot);
+  const historicDir=path.join(historicRoot,historicEntries[0]);
+  const historicManifest=JSON.parse(await fs.readFile(path.join(historicDir,'manifest.json'),'utf8'));
+  assert.equal(historicManifest.schema_version,20);
+  // The actually delivered20snapshot had no explicit schema_version field.
+  // Its pinned20checksum provenance must identify20without relabelling it21.
+  delete historicManifest.schema_version;
+  await fs.writeFile(path.join(historicDir,'manifest.json'),JSON.stringify(historicManifest));
+  assert.equal((await verifyBackup(historicDir)).schema_version,20);
+  execFileSync(pgRestore,['--data-only','--schema=public','--no-owner','--single-transaction','--exit-on-error','--dbname',D.url,path.join(historicDir,'database.dump')],{env:restoreEnv,stdio:'inherit'});
+  await D.client.query(integritySQL);
+  for(const t of tableNames) assert.equal(await tableHash(D.client,t),await tableHash(A.client,t),t);
+  await D.client.query(migration21);
+  for(const t of tableNames) assert.equal(await tableHash(D.client,t),await tableHash(A.client,t),t);
+  await D.client.query('begin;set local role authenticated');
+  await D.client.query("select set_config('request.jwt.claim.sub',$1,true)",[OLD_ADMIN]);
+  const dashboard=(await D.client.query("select public.admin_dashboard(date '2026-11-22',date '2026-11-22') value")).rows[0].value;
+  assert.equal(dashboard.public_available_dresses,1);assert.equal(dashboard.public_reserved_dresses,0);assert.equal(dashboard.public_unavailable_dresses,0);
+  await D.client.query('rollback');
+  console.log('PASS historic20capture -> migrations1-20 -> data restore -> integrity ->21upgrade, all24table hashes unchanged and new dashboard counts correct');
 
   // Content comparison on every public table.
   const tables = (await A.client.query(

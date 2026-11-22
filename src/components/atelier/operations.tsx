@@ -137,10 +137,32 @@ export function OperationsBoard({
           />
         </div>
       ) : (
-        <p className="text-xs leading-7 text-muted-foreground">
-          التقويم يعرض الحجوزات المصرح بها لهذا الحساب فقط. مركز التنبيهات العام
-          للأدمن.
-        </p>
+        <section className="space-y-5" aria-label="مهام الموظف اليومية">
+          <h2 className="text-lg">مهام اليوم والمتابعة</h2>
+          <p className="text-xs leading-8 text-muted-foreground">
+            مشاهدة كل الحجوزات لا تمنح صلاحية تسليمها أو إرجاعها. افتح الحجز
+            لتسجيل القبض؛ التسليم والعودة والتجهيز لما أنشأته أو أُسند إليك، أو
+            للأدمن. مركز الإشعارات وحالة قراءتها وتنبيه تعارض الحجوزات للأدمن
+            فقط.
+          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <AlertGroup
+              title="تسليمات اليوم"
+              bookings={alerts.outgoingToday}
+              preview={preview}
+            />
+            <AlertGroup
+              title="استلامات اليوم"
+              bookings={alerts.incoming}
+              preview={preview}
+            />
+            <AlertGroup
+              title="حجوزات تحتاج متابعة"
+              bookings={[...alerts.unrecorded, ...alerts.overdue]}
+              preview={preview}
+            />
+          </div>
+        </section>
       )}
       <section id="calendar" className="studio-card overflow-hidden p-4 md:p-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">

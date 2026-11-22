@@ -1084,3 +1084,83 @@ test("shared booking view explains receipt scope without implying operational ac
     ),
   ).toBeTruthy();
 });
+
+test("employee daily queues show today and followup without admin notification controls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/operations?role=employee&month=2027-01");
+  await expect(
+    page.getByRole("heading", { name: "مهام اليوم والمتابعة" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "تسليمات اليوم (١)" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "استلامات اليوم (١)" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "حجوزات تحتاج متابعة (١)" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/مشاهدة كل الحجوزات لا تمنح صلاحية تسليمها أو إرجاعها/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "تجهيز للخروج غدًا (٠)" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /تعليم كمقروء/ })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("heading", { name: /تقويم يناير/ }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "evidence/employee-daily-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "evidence/employee-daily-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+});
+
+test("admin manual catalogue counts are explicit and separate from financial period and dates", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/admin");
+  await expect(
+    page.getByRole("heading", {
+      name: "حالات عرض الكتالوج، فساتين غير مؤرشفة",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/هذه أعداد التسميات اليدوية للكتالوج/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/هذا ملخص قراءة للأدمن فقط، لا يغيّر السجلات/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/لا يوجد رد مبالغ تلقائي أو تصحيح استثنائي مفترض/),
+  ).toBeVisible();
+  await expect(page.getByText(/مطلوب استكمالها/)).toHaveCount(0);
+  for (const label of ["متاح للعرض", "محجوز للعرض", "غير متاح للعرض"])
+    await expect(
+      page.getByRole("heading", { name: label, exact: true }),
+    ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "evidence/admin-public-counts-mobile.png",
+    fullPage: true,
+  });
+});

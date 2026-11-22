@@ -4300,6 +4300,126 @@ try {
       );
     },
   );
+  const dashboardBefore21 = (
+    await asUser(admin, "select public.admin_dashboard($1::date,$1::date) c", [
+      editDays.today,
+    ])
+  ).rows[0].c;
+  await client.query(
+    await fs.readFile(
+      new URL("202611220021_daily_dashboard_completion.sql", migrationsDir),
+      "utf8",
+    ),
+  );
+  await check(
+    "dashboard21 extends manual-label counts without changing original metrics or data",
+    async () => {
+      const current = (
+        await asUser(
+          admin,
+          "select public.admin_dashboard($1::date,$1::date) c",
+          [editDays.today],
+        )
+      ).rows[0].c;
+      const {
+        public_available_dresses,
+        public_reserved_dresses,
+        public_unavailable_dresses,
+        ...legacy
+      } = current;
+      assert.deepEqual(legacy, dashboardBefore21);
+      assert.equal(
+        public_available_dresses +
+          public_reserved_dresses +
+          public_unavailable_dresses,
+        current.active_dresses,
+      );
+      for (const [label, key] of [
+        ["available", "public_available_dresses"],
+        ["reserved", "public_reserved_dresses"],
+        ["unavailable", "public_unavailable_dresses"],
+      ]) {
+        const exact = (
+          await client.query(
+            "select count(*)::int n from public.dresses where not archived and public_availability=$1",
+            [label],
+          )
+        ).rows[0].n;
+        assert.equal(current[key], exact);
+      }
+    },
+  );
+  await check(
+    "manual public labels are not inferred from booking dates or operation and exclude archives",
+    async () => {
+      const d = (
+        await asUser(
+          admin,
+          "insert into public.dresses(code,name,color,size,category_id,public_availability) select $1,'Manual label fixture','pink','M',id,'reserved' from public.categories limit 1 returning id",
+          [`LABEL-${crypto.randomUUID().slice(0, 8)}`],
+        )
+      ).rows[0].id;
+      await asUser(
+        admin,
+        "select public.create_booking(gen_random_uuid(),$1,'اختبار حالة الكتالوج','TEST-LABEL',(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+2,10000,0,null)",
+        [d],
+      );
+      const sql = "select public.admin_dashboard($1::date,$1::date) c";
+      const before = (await asUser(admin, sql, [editDays.today])).rows[0].c;
+      await asUser(
+        admin,
+        "select public.set_dress_operation($1,'maintenance')",
+        [d],
+      );
+      assert.deepEqual(
+        (await asUser(admin, sql, [editDays.today])).rows[0].c,
+        before,
+      );
+      await asUser(
+        admin,
+        "update public.dresses set public_availability='available' where id=$1",
+        [d],
+      );
+      const changed = (await asUser(admin, sql, [editDays.today])).rows[0].c;
+      assert.equal(
+        changed.public_available_dresses,
+        before.public_available_dresses + 1,
+      );
+      assert.equal(
+        changed.public_reserved_dresses,
+        before.public_reserved_dresses - 1,
+      );
+      await asUser(
+        admin,
+        "update public.dresses set archived=true where id=$1",
+        [d],
+      );
+      const archived = (await asUser(admin, sql, [editDays.today])).rows[0].c;
+      assert.equal(
+        archived.public_available_dresses,
+        before.public_available_dresses,
+      );
+      const distant = (await asUser(admin, sql, ["2027-01-01"])).rows[0].c;
+      assert.equal(
+        distant.public_available_dresses,
+        archived.public_available_dresses,
+      );
+      assert.equal(
+        distant.public_reserved_dresses,
+        archived.public_reserved_dresses,
+      );
+      for (const uid of [employee, other, inactive])
+        await deny(uid, sql, [editDays.today], /not_authorized/);
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.admin_dashboard(date,date)','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,
@@ -4310,7 +4430,7 @@ try {
     );
   });
   await check(
-    "fresh database applies all20 migrations and enforces the corrected final receipt/cancellation boundary",
+    "fresh database applies all21 migrations and enforces the corrected final receipt/cancellation boundary",
     async () => {
       await client.query("create database atelier_fresh");
       const previous = client;
@@ -4355,6 +4475,15 @@ try {
         assert.equal(cfg.booking_edit_ready, true);
         assert.equal(cfg.maintenance_admin_ready, true);
         assert.equal(cfg.shared_booking_receipts_ready, true);
+        const summary = (
+          await asUser(
+            admin,
+            "select public.admin_dashboard(current_date,current_date) c",
+          )
+        ).rows[0].c;
+        assert.equal(summary.public_available_dresses, 0);
+        assert.equal(summary.public_reserved_dresses, 0);
+        assert.equal(summary.public_unavailable_dresses, 0);
         assert.equal(
           (await asUser(admin, "select public.get_staff_management_config() c"))
             .rows[0].c.ready,

@@ -1,4 +1,4 @@
-# Verification record, 0.20.1
+# Verification record, 0.21.0
 
 Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
 
@@ -6,9 +6,9 @@ Checked locally on 22 November 2026. This source checkpoint is not a claim that 
 
 - ESLint and TypeScript: pass.
 - 48 unit tests: pass.
-- 248 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
+- 253 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
 - Optimized Next.js builds with functional portfolio flag off and on: pass.
-- 24 Chrome browser scenarios in each optimized functional/default-flag build: pass.
+- 26 Chrome browser scenarios in each optimized functional/default-flag build: pass.
 - npm audit with production dependencies: zero reported vulnerabilities at this checkpoint. An audit is not a security guarantee.
 
 ## Functional synthetic mode coverage
@@ -179,3 +179,11 @@ Integrated the independently reviewed20 correction, preserving its exact source 
 Provider template was independently read from https://raw.githubusercontent.com/supabase/supabase/master/apps/studio/components/interfaces/Database/Triggers/EventTriggersList/EventTriggers.constants.ts and matched the included restricted event-trigger body. These scripts add no live grants/settings or resources by being included. The user must use the separately verified new target only for recovery. No dump, password, secret URL or real backup artifact is shipped in the source archive.
 
 Patch checks:48unit,lint,typecheck and production build pass again. Full248DB/24Chrome-per-flag application evidence is from the unchanged20 app/migrations immediately before this scripts/docs-only patch; the backup test itself was rerun after integration. Hosted signature/capture and actual Supabase Auth/Storage recovery remain separate, not claimed by the local adapters. Full MVP remains open until coordinated acceptance closes its remaining work.
+
+## Original-MVP detail completion21
+
+Current21 checks:48unit,253actual local PostgreSQL checks,lint/typecheck,optimized default/functional builds,26Chrome scenarios on EACH build,production audit0. New DB checks compare every prior20dashboard metric unchanged by migration21; compare all three manual-label counts to exact SQL; prove operational maintenance does not infer a label, changing a label changes the corresponding counts, archives are excluded, financial date range does not change stock counts, employee/inactive/anon access still denies, and all21 fresh install returns valid zero label counts. Tests use synthetic registered fixtures, not live data or exceptions to operational guards.
+
+Actual employee daily desktop/mobile and admin manual-label-count mobile pixels inspected: readable RTL task cards, clear action-scope explanation, no admin notification controls in employee view, distinct manual-label caveat, and no mobile overflow. The daily queues remain current-day even when a different month is selected. Evidence: employee-daily-desktop/mobile.png and admin-public-counts-mobile.png, plus refreshed admin dashboard screenshots. Lists link to booking pages whose mutation permissions remain unchanged.
+
+Independently integrated and reran the21backup correction with exact20/21migration checksum maps. The existing fresh21plain/provider-profile capture-and-restore tests pass. A fourth isolated target reconstructs20, restores an actual historical20archive, checks integrity/content, then applies21 once:24table hashes remain identical and new dashboard label counts are correct. Legacy20manifests lacking schema_version infer20ONLY from the complete pinned20checksums; they are not relabelled21. The accepted live20snapshot remains historical. No new cloud capture, restore or account change by this source task. Final21hosted acceptance/source-and-recovery-package coordination remains parent-owned.

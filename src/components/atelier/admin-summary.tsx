@@ -52,6 +52,28 @@ export function AdminSummary({
           ))}
         </div>
       </section>
+      <section
+        className="studio-card space-y-5 p-6 md:p-8"
+        aria-label="حالات عرض الكتالوج"
+      >
+        <h2 className="text-lg">حالات عرض الكتالوج، فساتين غير مؤرشفة</h2>
+        <p className="text-xs leading-8 text-muted-foreground">
+          هذه أعداد التسميات اليدوية للكتالوج، لا حالة الصيانة أو خروج الفستان،
+          ولا ضمان توفره في تاريخ معين. منفصلة عن الفترة المالية المختارة.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[
+            ["متاح للعرض", data.public_available_dresses],
+            ["محجوز للعرض", data.public_reserved_dresses],
+            ["غير متاح للعرض", data.public_unavailable_dresses],
+          ].map(([label, value]) => (
+            <article key={label} className="rounded-xl border p-5">
+              <h3 className="text-xs leading-7">{label}</h3>
+              <p className="mt-3 text-2xl">{number(Number(value))}</p>
+            </article>
+          ))}
+        </div>
+      </section>
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg">التشغيل الحالي</h2>
@@ -91,10 +113,10 @@ export function AdminSummary({
         </div>
       </section>
       <p className="rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
-        الملخص للأدمن فقط. لا يغيّر أي سجل ولا يشغّل الحجوزات. مركز الإشعارات
-        المحفوظ وحالة القراءة، والتسليم والعودة والإلغاء والاسترداد والتقارير
-        والتصدير ما زالت مسارات منفصلة مطلوب استكمالها؛ هذه الشاشة لا تعني
-        اكتمال دورة التشغيل.
+        هذا ملخص قراءة للأدمن فقط، لا يغيّر السجلات. تسجيل القبض والتسليم والعودة
+        والإلغاء يتم من شاشة الحجز، والإشعارات والتقارير والتصدير لها شاشاتها
+        المنفصلة. لا يوجد رد مبالغ تلقائي أو تصحيح استثنائي مفترض للدفعات
+        التاريخية.
       </p>
     </div>
   );

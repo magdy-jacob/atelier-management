@@ -42,9 +42,9 @@ class Session:
         try: self.p.communicate('rollback;\n', timeout=10)
         except Exception: self.p.kill(); self.p.wait()
 
-def capture(s,provider_profile=None):
+def capture(s,provider_profile=None,schema_version=21):
     signature=sorted(s.query(SIGNATURE_SQL))
-    expected=json.loads(pathlib.Path(__file__).with_name('backup-schema-v20.json').read_text())
+    expected=json.loads(pathlib.Path(__file__).with_name(f'backup-schema-v{schema_version}.json').read_text())
     wanted=canonical(expected['signature'])
     if provider_profile=='supabase-studio-v1':
         wanted += canonical([expected['provider_function']])
@@ -52,7 +52,7 @@ def capture(s,provider_profile=None):
         wanted += [f'table_grant|{t}|service_role|{p}|false' for t in TABLES for p in ('MAINTAIN','REFERENCES','TRIGGER','TRUNCATE')]
     if canonical(signature)!=sorted(wanted): raise RuntimeError('Unknown schema signature; refuse backup until source-coordinated review')
     tables=s.query("select coalesce(json_agg(tablename order by tablename),'[]') from pg_tables where schemaname='public'")
-    if sorted(tables)!=sorted(TABLES): raise RuntimeError('Unexpected schema version: expected v20 public table set')
+    if sorted(tables)!=sorted(TABLES): raise RuntimeError('Unexpected schema version: expected versioned public table set')
     rows={}
     for t in tables:
         rows[t]=s.query('select json_build_object(\'count\',count(*),\'hash\',md5(coalesce(string_agg(h,\'\' order by h),\'\'))) from (select md5(row_to_json(t)::text) h from public."'+t+'" t) x')
@@ -75,7 +75,7 @@ def download(base, name):
         return response.read()
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument('--quiescent',action='store_true',help='Confirm all writers are stopped until backup finishes'); p.add_argument('--output',default='backups'); p.add_argument('--provider-profile',choices=['supabase-studio-v1']); a=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument('--quiescent',action='store_true',help='Confirm all writers are stopped until backup finishes'); p.add_argument('--output',default='backups'); p.add_argument('--schema-version',type=int,choices=[20,21],default=21); p.add_argument('--provider-profile',choices=['supabase-studio-v1']); a=p.parse_args()
     if not a.quiescent: raise RuntimeError('Stop app/admin/Storage writers first, then pass --quiescent')
     env=dict(os.environ)
     if env.get('PGBIN'): env['PATH']=env['PGBIN']+os.pathsep+env.get('PATH','')
@@ -93,7 +93,7 @@ def main():
         client=int(re.search(r'\d+',subprocess.check_output(['pg_dump','--version'],text=True,env=env)).group())
         if client<version: raise RuntimeError('pg_dump client older than server')
         snapshot=session.query('select to_json(pg_export_snapshot())')
-        before=capture(session,a.provider_profile)
+        before=capture(session,a.provider_profile,a.schema_version)
         # Independent Storage inventory covers ALL bucket objects, including unlinked ones.
         names=[safe_name(x['path']) for x in before['objects']]
         if len(names)!=len(set(names)) or not set(before['paths']).issubset(names): raise RuntimeError('Storage inventory missing linked images or duplicate names')
@@ -112,12 +112,12 @@ def main():
         check=Session(env)
         try:
             check.p.stdin.write('begin isolation level repeatable read read only;set local search_path=public,pg_catalog;\n'); check.p.stdin.flush()
-            after=capture(check,a.provider_profile)
+            after=capture(check,a.provider_profile,a.schema_version)
         finally: check.close()
         if before!=after: raise RuntimeError('Source changed during backup; retry with all writers stopped')
         (partial/'identities.json').write_text(json.dumps(before['identities'],ensure_ascii=False,indent=2)+'\n')
         (partial/'storage-index.json').write_text(json.dumps(index,ensure_ascii=False,indent=2)+'\n')
-        manifest=dict(format=3,project_url=base,provider_profile=a.provider_profile,scope='v20 public schema + dress-images + email/Auth application bindings; no passwords or MFA',created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),snapshot=before,files={str(f.relative_to(partial)):digest(f) for f in sorted(partial.rglob('*')) if f.is_file()})
+        manifest=dict(format=3,schema_version=a.schema_version,project_url=base,provider_profile=a.provider_profile,scope='versioned public schema + dress-images + email/Auth application bindings; no passwords or MFA',created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),snapshot=before,files={str(f.relative_to(partial)):digest(f) for f in sorted(partial.rglob('*')) if f.is_file()})
         # Manifest is written last, then the WHOLE backup is atomically renamed.
         (partial/'manifest.json.tmp').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
         os.replace(partial/'manifest.json.tmp',partial/'manifest.json')
@@ -135,4 +135,4 @@ if __name__=='__main__':
     try: main()
     except Exception:
         # Never echo tool stderr, connection strings, or secret-bearing args.
-        print('Backup FAILED. No complete backup was published. Check client versions, permissions, schema v20, writer quiescence, and Storage availability.'); raise SystemExit(1)
+        print('Backup FAILED. No complete backup was published. Check client versions, permissions, expected schema version, writer quiescence, and Storage availability.'); raise SystemExit(1)

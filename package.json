@@ -1,6 +1,6 @@
 {
   "name": "atelier",
-  "version": "0.20.1",
+  "version": "0.21.1",
   "private": true,
   "scripts": {
     "dev": "next dev",

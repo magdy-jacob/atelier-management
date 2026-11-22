@@ -42,7 +42,8 @@ export default async function Operations({
     .order("starts_on")
     .limit(1000);
   const results = [calendar];
-  if (profile.role === "admin") {
+  {
+    // Active staff already have shared booking reads; these queues confer no writes.
     const alertResults = await Promise.all([
       db
         .from("bookings")

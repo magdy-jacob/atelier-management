@@ -21,7 +21,7 @@ export default async function Bookings() {
   return (
     <StaffFrame
       title="الحجوزات"
-      description="آخر ١٠٠ حجز مصرح به لحسابك. الموظف لا يرى تلقائيًا حجوزات زملائه أو لوحة مالية عامة."
+      description="آخر ١٠٠ حجز من كل حجوزات الأتيليه. الموظف والأدمن يسجلان المقدم والباقي المستلم، دون إتاحة لوحة مالية عامة للموظف."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/bookings"

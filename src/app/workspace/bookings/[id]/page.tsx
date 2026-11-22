@@ -27,7 +27,7 @@ export default async function BookingDetails({
   const { data: b, error } = await db
     .from("bookings")
     .select(
-      "id,version,dress_id,customer_id,starts_on,returns_on,status,agreed_price_piasters,dresses(name,code),customers(full_name,phone)",
+      "id,version,created_by,assigned_to,dress_id,customer_id,starts_on,returns_on,status,agreed_price_piasters,dresses(name,code),customers(full_name,phone)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -47,6 +47,10 @@ export default async function BookingDetails({
       .select("id,amount_piasters,reason")
       .eq("booking_id", id),
   ]);
+  const operatesBooking =
+    profile.role === "admin" ||
+    b.created_by === profile.id ||
+    b.assigned_to === profile.id;
   const config = await getBookingConfig(db);
   const { data: workflowRaw, error: workflowError } = await db.rpc(
     "get_booking_workflow",
@@ -195,7 +199,8 @@ export default async function BookingDetails({
           enabled={
             bookingConfigReady(config) &&
             config?.receipt_timing_ready === true &&
-            !!receiptContext
+            !!receiptContext &&
+            (operatesBooking || config?.shared_booking_receipts_ready === true)
           }
         />
       )}
@@ -214,6 +219,7 @@ export default async function BookingDetails({
             remaining={remaining.toString()}
             data={workflow.data}
             enabled={workflowReady(config)}
+            operationalAccess={operatesBooking}
           />
         ) : (
           <Unavailable />

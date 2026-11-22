@@ -1027,3 +1027,60 @@ test("maintenance clearance is explicitly admin-only and separate from ordinary 
     ),
   ).toBeTruthy();
 });
+
+test("admin dress history keeps cancelled bookings and scoped audit values off employee rendering", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/dress-history");
+  await expect(
+    page.getByRole("heading", { name: "حجوزات الفستان وتاريخه، للأدمن" }),
+  ).toBeVisible();
+  await expect(page.getByText("ملغي", { exact: true })).toBeVisible();
+  await page.getByText("عرض القيم السابقة والجديدة", { exact: true }).click();
+  await expect(page.locator("pre").first()).toContainText("fixture-dress");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/dress-history-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/dress-history-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/demo/dress-history?role=employee");
+  await expect(
+    page.getByRole("heading", { name: "حجوزات الفستان وتاريخه، للأدمن" }),
+  ).toHaveCount(0);
+  await expect(page.locator("pre")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("fixture-booking");
+});
+
+test("shared booking view explains receipt scope without implying operational access", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/workflow?view=shared-read");
+  await expect(
+    page.getByText(/يمكنك مشاهدة هذا الحجز وتسجيل المقدم أو الباقي المستلم/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "تأكيد خروج الفستان", exact: true }),
+  ).toBeDisabled();
+  await page.screenshot({
+    path: "evidence/shared-booking-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+});

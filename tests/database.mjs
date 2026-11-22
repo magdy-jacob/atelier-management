@@ -3991,6 +3991,315 @@ try {
       );
     },
   );
+  // Upgrade checkpoint20: shared reads/receipts must not broaden operational or admin writes.
+  await client.query(
+    await fs.readFile(
+      new URL("202611220020_shared_booking_scope.sql", migrationsDir),
+      "utf8",
+    ),
+  );
+  let sharedBooking, sharedDress;
+  const sharedReceipt =
+    "select public.record_booking_receipt($1,$2,$3,$4,$5,$6) id";
+  await check(
+    "shared booking visibility covers customer ledger and workflow without ownership",
+    async () => {
+      await client.query(
+        "update public.settings set synthetic_test_enabled=true,live_bookings_enabled=true where id=true",
+      );
+      const b = (
+        await asUser(
+          admin,
+          "select public.create_portfolio_scenario(gen_random_uuid(),'handover',null) id",
+        )
+      ).rows[0].id;
+      sharedBooking = b;
+      const row = (
+        await asUser(other, "select * from public.bookings where id=$1", [b])
+      ).rows[0];
+      assert.ok(row);
+      sharedDress = row.dress_id;
+      assert.equal(row.created_by, admin);
+      assert.notEqual(row.assigned_to, other);
+      assert.equal(
+        (
+          await asUser(other, "select * from public.customers where id=$1", [
+            row.customer_id,
+          ])
+        ).rowCount,
+        1,
+      );
+      assert.equal(
+        (
+          await asUser(
+            other,
+            "select * from public.payments where booking_id=$1",
+            [b],
+          )
+        ).rowCount,
+        1,
+      );
+      assert.equal(
+        (
+          await asUser(
+            other,
+            "select public.can_access_booking($1) c,public.can_view_booking($1) v",
+            [b],
+          )
+        ).rows[0].c,
+        false,
+      );
+      assert.equal(
+        (await asUser(other, "select public.get_staff_booking_config() c"))
+          .rows[0].c.shared_booking_receipts_ready,
+        true,
+      );
+      assert.ok(
+        (await asUser(other, "select public.get_booking_workflow($1) c", [b]))
+          .rows[0].c.today,
+      );
+      assert.equal(
+        (
+          await asUser(
+            other,
+            "select public.can_view_booking(gen_random_uuid()) v",
+          )
+        ).rows[0].v,
+        false,
+      );
+    },
+  );
+  await check(
+    "unassigned employee cannot hand over return prepare reprice cancel or add fees",
+    async () => {
+      await deny(
+        other,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [sharedBooking],
+        /not_authorized/,
+      );
+      await deny(
+        other,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [sharedBooking],
+        /not_authorized/,
+      );
+      await deny(
+        other,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [sharedDress],
+        /not_authorized/,
+      );
+      const b = (
+        await asUser(other, "select * from public.bookings where id=$1", [
+          sharedBooking,
+        ])
+      ).rows[0];
+      await deny(
+        other,
+        editSql,
+        [
+          crypto.randomUUID(),
+          sharedBooking,
+          b.version,
+          b.starts_on,
+          b.returns_on,
+          20000,
+          "اختبار صلاحية",
+          true,
+        ],
+        /not_authorized/,
+      );
+      await deny(
+        other,
+        "select public.cancel_booking(gen_random_uuid(),$1,'اختبار',true)",
+        [sharedBooking],
+        /not_authorized/,
+      );
+      await deny(
+        other,
+        "select public.add_late_fee(gen_random_uuid(),$1,100,'اختبار')",
+        [sharedBooking],
+        /not_authorized/,
+      );
+      for (const table of ["booking_changes", "activity_logs", "dress_prices"])
+        assert.equal(
+          (await asUser(other, `select * from public.${table}`)).rowCount,
+          0,
+        );
+    },
+  );
+  await check(
+    "unassigned balance collector preserves return confirmation timing idempotency and actor",
+    async () => {
+      const args = [
+        crypto.randomUUID(),
+        sharedBooking,
+        7500,
+        null,
+        "return_balance",
+        true,
+      ];
+      await deny(other, sharedReceipt, args, /balance_at_return_only/);
+      await asUser(
+        admin,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [sharedBooking],
+      );
+      assert.equal(
+        (
+          await asUser(
+            other,
+            "select * from public.handover_records where booking_id=$1",
+            [sharedBooking],
+          )
+        ).rowCount,
+        1,
+      );
+      await deny(
+        other,
+        sharedReceipt,
+        [args[0], sharedBooking, 7500, null, "return_balance", false],
+        /customer_return_confirmation_required/,
+      );
+      const id = (await asUser(other, sharedReceipt, args)).rows[0].id;
+      assert.equal((await asUser(other, sharedReceipt, args)).rows[0].id, id);
+      assert.equal(
+        (
+          await asUser(
+            other,
+            "select recorded_by from public.payments where id=$1",
+            [id],
+          )
+        ).rows[0].recorded_by,
+        other,
+      );
+      assert.equal(
+        (
+          await asUser(
+            other,
+            "select * from public.receipt_confirmations where payment_id=$1",
+            [id],
+          )
+        ).rowCount,
+        1,
+      );
+      await deny(
+        other,
+        sharedReceipt,
+        [args[0], sharedBooking, 1, null, "return_balance", true],
+        /request_id_payload_mismatch/,
+      );
+      await deny(employee, sharedReceipt, args, /request_id_conflict/);
+      await asUser(
+        admin,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [sharedBooking],
+      );
+      assert.equal(
+        (
+          await asUser(
+            other,
+            "select * from public.return_records where booking_id=$1",
+            [sharedBooking],
+          )
+        ).rowCount,
+        1,
+      );
+    },
+  );
+  await check(
+    "both roles can collect initial deposit on a booking they did not create",
+    async () => {
+      for (const collector of [other, admin]) {
+        const d = (
+          await asUser(
+            admin,
+            "insert into public.dresses(code,name,color,size,category_id) select $1,'Shared fixture','pink','M',id from public.categories limit 1 returning id",
+            [`SHARED-${crypto.randomUUID().slice(0, 8)}`],
+          )
+        ).rows[0].id;
+        const b = (
+          await asUser(
+            employee,
+            "select public.create_booking(gen_random_uuid(),$1,'اختبار قبض مشترك','TEST-SHARED',(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+2,10000,0,null) id",
+            [d],
+          )
+        ).rows[0].id;
+        const args = [
+          crypto.randomUUID(),
+          b,
+          2500,
+          "اختبار كاش",
+          "deposit",
+          false,
+        ];
+        const id = (await asUser(collector, sharedReceipt, args)).rows[0].id;
+        assert.equal(
+          (await asUser(collector, sharedReceipt, args)).rows[0].id,
+          id,
+        );
+        await deny(
+          collector,
+          sharedReceipt,
+          [crypto.randomUUID(), b, 100, null, "deposit", false],
+          /deposit_already_recorded/,
+        );
+        await deny(
+          collector,
+          "insert into public.payments(request_id,booking_id,amount_piasters,kind,recorded_by) values(gen_random_uuid(),$1,1,'deposit',$2)",
+          [b, collector],
+          /permission denied/,
+        );
+      }
+    },
+  );
+  await check(
+    "inactive and anonymous callers gain no shared visibility or collection",
+    async () => {
+      for (const table of [
+        "bookings",
+        "customers",
+        "payments",
+        "late_fees",
+        "handover_records",
+        "return_records",
+        "receipt_confirmations",
+      ])
+        assert.equal(
+          (await asUser(inactive, `select * from public.${table}`)).rowCount,
+          0,
+        );
+      await deny(
+        inactive,
+        "select public.can_view_booking($1) v,public.get_booking_workflow($1) w",
+        [sharedBooking],
+        /not_authorized/,
+      );
+      await deny(
+        inactive,
+        sharedReceipt,
+        [crypto.randomUUID(), sharedBooking, 1, null, "deposit", false],
+        /not_authorized/,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.can_view_booking(uuid)','EXECUTE') c, has_function_privilege('anon','public.record_booking_receipt(uuid,uuid,bigint,text,text,boolean)','EXECUTE') r",
+          )
+        ).rows[0].c,
+        false,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.record_booking_receipt(uuid,uuid,bigint,text,text,boolean)','EXECUTE') r",
+          )
+        ).rows[0].r,
+        false,
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,
@@ -4001,7 +4310,7 @@ try {
     );
   });
   await check(
-    "fresh database applies all19 migrations and enforces the corrected final receipt/cancellation boundary",
+    "fresh database applies all20 migrations and enforces the corrected final receipt/cancellation boundary",
     async () => {
       await client.query("create database atelier_fresh");
       const previous = client;
@@ -4045,6 +4354,7 @@ try {
         assert.equal(cfg.cancellation_ready, true);
         assert.equal(cfg.booking_edit_ready, true);
         assert.equal(cfg.maintenance_admin_ready, true);
+        assert.equal(cfg.shared_booking_receipts_ready, true);
         assert.equal(
           (await asUser(admin, "select public.get_staff_management_config() c"))
             .rows[0].c.ready,

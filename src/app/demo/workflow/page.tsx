@@ -9,6 +9,7 @@ export default async function WorkflowPreview({
 }) {
   const requested = (await searchParams).view ?? "return";
   const view = [
+    "shared-read",
     "handover",
     "return",
     "unpaid",
@@ -19,7 +20,7 @@ export default async function WorkflowPreview({
     : "return";
   const returned = view === "returned" || view === "maintenance-admin";
   const admin = view === "maintenance-admin";
-  const handover = view === "handover";
+  const handover = view === "handover" || view === "shared-read";
   const data: WorkflowData = {
     today: admin ? "2026-12-07" : "2026-12-05",
     handover: handover
@@ -71,6 +72,7 @@ export default async function WorkflowPreview({
         ))}
       </nav>
       <BookingWorkflow
+        operationalAccess={view !== "shared-read"}
         admin={admin}
         key={view}
         bookingId="demo-booking"

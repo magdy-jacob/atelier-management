@@ -316,6 +316,7 @@ export function BookingWorkflow({
   remaining,
   data,
   enabled,
+  operationalAccess = true,
   admin = false,
   preview = false,
 }: {
@@ -328,6 +329,7 @@ export function BookingWorkflow({
   remaining: string;
   data: WorkflowData;
   enabled: boolean;
+  operationalAccess?: boolean;
   admin?: boolean;
   preview?: boolean;
 }) {
@@ -347,6 +349,12 @@ export function BookingWorkflow({
         ضمان بالحالة فقط. لا رقم أو صورة بطاقة، ولا مرفقات. اليوم حسب مصر{" "}
         {formatDay(data.today)}.
       </p>
+      {!operationalAccess && (
+        <p className="rounded-xl border bg-secondary p-4 text-xs leading-8">
+          يمكنك مشاهدة هذا الحجز وتسجيل المقدم أو الباقي المستلم. التسليم
+          والعودة وتأكيد التجهيز للحجز الذي أنشأته أو أُسند إليك، أو للأدمن.
+        </p>
+      )}
       {!enabled && (
         <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
           الحفظ غير متاح في المعاينة أو قبل اكتمال إعداد الاختبار الوظيفي.
@@ -425,7 +433,7 @@ export function BookingWorkflow({
       {status === "confirmed" && (
         <HandoverForm
           bookingId={bookingId}
-          enabled={enabled && !maintenanceHeld}
+          enabled={enabled && operationalAccess && !maintenanceHeld}
           today={data.today}
           inDays={handoverInPlannedDays(data.today, startsOn, returnsOn)}
           hasDeposit={BigInt(paid) > BigInt(0)}
@@ -436,7 +444,7 @@ export function BookingWorkflow({
       {status === "out" && (
         <ReturnForm
           bookingId={bookingId}
-          enabled={enabled}
+          enabled={enabled && operationalAccess}
           remaining={remaining}
           today={data.today}
           preview={preview}
@@ -449,7 +457,9 @@ export function BookingWorkflow({
           <ReadyForm
             bookingId={bookingId}
             dressId={dressId}
-            enabled={enabled && (!maintenanceHeld || admin)}
+            enabled={
+              enabled && operationalAccess && (!maintenanceHeld || admin)
+            }
             today={data.today}
             readyOn={data.ready_on}
             preview={preview}

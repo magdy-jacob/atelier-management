@@ -1,3 +1,5 @@
+import { DressHistory } from "@/components/atelier/dress-history";
+import { Unavailable } from "@/components/atelier/staff-frame";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -49,6 +51,31 @@ export default async function ManageDress({
       : null;
   if (cleanup?.error)
     throw new Error("تعذر التحقق من ملفات الصور المعلقة؛ أعد المحاولة.");
+  // The id was validated above. Only admin sessions fetch historical rows;
+  // employee rendering never receives the bookings, audit JSON or actor names.
+  const history =
+    profile.role === "admin"
+      ? await Promise.all([
+          db
+            .from("bookings")
+            .select("id,starts_on,returns_on,status,agreed_price_piasters")
+            .eq("dress_id", id)
+            .order("starts_on", { ascending: false })
+            .limit(100),
+          db
+            .from("activity_logs")
+            .select(
+              "id,actor_id,action,entity,entity_id,created_at,old_data,new_data",
+            )
+            .or(
+              `entity_id.eq.${id},old_data->>dress_id.eq.${id},new_data->>dress_id.eq.${id}`,
+            )
+            .order("id", { ascending: false })
+            .limit(100),
+          db.from("profiles").select("id,full_name"),
+        ])
+      : null;
+  const historyError = history?.some((r) => !!r.error);
   const images = (photos ?? []).map((image) => ({
     ...image,
     url: db.storage.from("dress-images").getPublicUrl(image.path).data
@@ -78,6 +105,23 @@ export default async function ManageDress({
           readOnly={profile.role !== "admin"}
           cleanupJobs={cleanup?.data ?? []}
         />
+        {history &&
+          (historyError ? (
+            <Unavailable />
+          ) : (
+            <DressHistory
+              admin
+              bookings={(history[0].data ?? []).map((b) => ({
+                ...b,
+                agreed_price_piasters: Number(b.agreed_price_piasters),
+                dressName: dress.name,
+              }))}
+              logs={history[1].data ?? []}
+              names={Object.fromEntries(
+                (history[2].data ?? []).map((p) => [p.id, p.full_name]),
+              )}
+            />
+          ))}
       </main>
     </>
   );

@@ -1,4 +1,4 @@
-# Verification record, 0.19.0
+# Verification record, 0.20.0
 
 Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
 
@@ -6,9 +6,9 @@ Checked locally on 22 November 2026. This source checkpoint is not a claim that 
 
 - ESLint and TypeScript: pass.
 - 48 unit tests: pass.
-- 227 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
+- 248 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
 - Optimized Next.js builds with functional portfolio flag off and on: pass.
-- 22 Chrome browser scenarios in the optimized functional build: pass. A separate default-flag build is also verified.
+- 24 Chrome browser scenarios in each optimized functional/default-flag build: pass.
 - npm audit with production dependencies: zero reported vulnerabilities at this checkpoint. An audit is not a security guarantee.
 
 ## Functional synthetic mode coverage
@@ -18,7 +18,7 @@ Checked locally on 22 November 2026. This source checkpoint is not a claim that 
 - Private registry tables cannot be edited by application roles. Unregistered records reject operational/financial changes in synthetic mode.
 - Ordinary same-day booking and pre-window handover still reject. A returned dress cannot be marked ready before its full preparation day.
 - Admin-only current-day scenario setup rejects an inactive assignee or invalid case, preserves original review-booking fingerprints, and exact retry returns one booking. Changed replay payload rejects.
-- Assigned employee can complete deposit handover, remaining receipt and balance-gated return; unrelated staff cannot see the case. A fully paid return case accepts multi-select maintenance. An overdue case appears in actual SQL notifications and accepts an optional admin fee, exact balance receipt and return.
+- Assigned employee can complete deposit handover, remaining receipt and balance-gated return. Since20, unrelated active staff can view every booking and record its initial deposit/return balance, but cannot perform handover/return/readiness. A fully paid return case accepts multi-select maintenance. An overdue case appears in actual SQL notifications and accepts an optional admin fee, exact balance receipt and return.
 - These scenarios fabricate their labelled setup history explicitly. They do not weaken the normal booking RPC's advance rule or reset original review records.
 - An uncertain image-metadata response can recover a committed link. Unverified attachment retains the object rather than deleting a possibly linked image. This port-helper behavior is covered by unit tests; live transport-failure injection is not claimed.
 
@@ -32,7 +32,7 @@ Evidence: `evidence/portfolio-scenarios-desktop.png`, `portfolio-scenarios-mobil
 
 Hosted authenticated creation/payment/handover/return/scenario feedback, actual employee sessions, vendor RLS/Storage and current deployment configuration are a separate acceptance step. No live setting or audience was changed by this local work. Do not present disabled preview clicks as hosted acceptance.
 
-Employee account management, booking editing and historical financial exceptions, future-availability review, backup/restore and full integrated hosted acceptance remain open. No actual payout or refund exists. The previous review dataset and original image objects must stay intact. See `DECISIONS.md` for settled and open policy boundaries.
+Employee account management and booking editing/availability are implemented and locally tested. Parent reports hosted Auth acceptance for18; newer hosted acceptance and historical financial exceptions, backup/restore and full integrated acceptance remain separate. No actual payout or refund exists. The previous review dataset and original image objects must stay intact. See `DECISIONS.md` for settled and open policy boundaries.
 
 ## Historical local checkpoints
 
@@ -163,3 +163,11 @@ Hosted acceptance still needs a disposable synthetic Auth creation, actual sign-
 Availability tests accept a future nonoverlapping reservation for a currently-out dress, reject its preparation day, and preserve existing future bookings when maintenance is recorded. Maintenance prevents new bookings/date moves/suggestions/handover. Employees cannot route through preparation to clear it; admin clearance still respects actual-return preparation. A two-booking collision fixture proves maintenance remains true through an outside state and a later sound return. Local fixtures deliberately backdate/construct synthetic historical cases for clock-bound branches; these are not a method for hosted acceptance or claims of real events.
 
 22 Chrome scenarios pass on the functional build, including edit role/state limits, history, retained native/controlled inputs, explicit Arabic date summary and maintenance admin/employee messaging. The first screenshot check found a sticky-banner capture artifact after input auto-scroll; screenshots were retaken from scroll-top and inspected again. Evidence: booking-edit-desktop/mobile and maintenance-admin/employee-mobile. Hosted acceptance and real Auth/Storage are separate, and no live rows/accounts were changed by this source work. Public catalogue availability remains a manually chosen label, not a date-specific promise.
+
+## Shared booking scope and admin dress history 0.20.0
+
+48 unit,248 PostgreSQL and24 Chrome scenarios per optimized build flag pass. The database suite tests pre20 legacy ownership separately, then20 upgrade and all20 fresh install. Unassigned active staff read bookings/customer contact/payments/fee amounts/handover/return/receipt confirmations, and collect initial deposits or physical-return balances with original timing, actor, exact retry and overpayment rules. Inactive/anon deny. Handover/return/readiness, date/price, cancellation/fee and admin audit/advisory-price boundaries remain independently denied. Direct receipt inserts still deny both application roles.
+
+Admin dress history renders cancelled/returned bookings and directly associated audit before/after values. Employee preview contains neither booking history nor audit JSON. Shared-booking UI explains limited operations and closes their controls. Actual dress-history desktop/mobile and shared-booking mobile PNG pixels were inspected for RTL, long JSON wrapping, labels, hierarchy and overflow. Latest Chrome suite refreshed those screenshots. Hosted PostgREST JSON-path filter, all-booking employee receipt collection and no-mutation permission controls still need independent acceptance. No live rows/accounts/keys changed in this source task.
+
+Backup correction is not included in20: the separate pinned19 package is under review and fails closed against live schema differences. It must be canonically matched with20 and independently retested, not silently accepted or run destructively. This release does not claim full MVP completion.

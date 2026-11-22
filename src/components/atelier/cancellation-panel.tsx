@@ -71,6 +71,11 @@ export function CancellationPanel({
           </p>
           <p>السبب: {cancellation.reason}</p>
         </div>
+      ) : status === "cancelled" ? (
+        <p className="text-xs leading-8 text-muted-foreground">
+          الحجز ملغي. تبقى الدفعات محفوظة دون رد تلقائي. تفاصيل قرار الإلغاء
+          تظهر ضمن صلاحية الحساب.
+        </p>
       ) : status !== "confirmed" ? (
         <p className="text-xs leading-8 text-muted-foreground">
           لا يُلغى حجز بعد تسليم الفستان. استخدم مسار العودة والفحص وتسوية

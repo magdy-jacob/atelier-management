@@ -1,4 +1,4 @@
-# Verification record, 0.20.0
+# Verification record, 0.20.1
 
 Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
 
@@ -171,3 +171,11 @@ Availability tests accept a future nonoverlapping reservation for a currently-ou
 Admin dress history renders cancelled/returned bookings and directly associated audit before/after values. Employee preview contains neither booking history nor audit JSON. Shared-booking UI explains limited operations and closes their controls. Actual dress-history desktop/mobile and shared-booking mobile PNG pixels were inspected for RTL, long JSON wrapping, labels, hierarchy and overflow. Latest Chrome suite refreshed those screenshots. Hosted PostgREST JSON-path filter, all-booking employee receipt collection and no-mutation permission controls still need independent acceptance. No live rows/accounts/keys changed in this source task.
 
 Backup correction is not included in20: the separate pinned19 package is under review and fails closed against live schema differences. It must be canonically matched with20 and independently retested, not silently accepted or run destructively. This release does not claim full MVP completion.
+
+## Backup integration patch0.20.1
+
+Integrated the independently reviewed20 correction, preserving its exact source migration checksums and fail-closed schema fixture. The provided19/20 archives remain unchanged. Added test:backup and ignores for backups/Python temporary files. Independent clean-folder and integrated-command runs pass with PGBIN pointing to privately extracted PostgreSQL18.7 clients: actual single-snapshot capture and archive restore into two separate targets,24-table hashes,39app functions/26policies/38triggers,4Auth identities including pending/completed staff jobs, nondefault profile versions, email-confirmation mismatch rejection, explicit all-FK sweep and negative missing-parent case, independent Storage inventory including unlinked paths.txt, upload/readback/overwrite rejection, corrupt-file and unknown-schema rejection. A third-DB named Studio-profile archive roundtrip passes with its extra reviewed function/event. Changed application policy still rejects under that profile. Canonicalization tests retain literal contents and token boundaries; PG18 NOT NULL catalog normalization still checks column attnotnull.
+
+Provider template was independently read from https://raw.githubusercontent.com/supabase/supabase/master/apps/studio/components/interfaces/Database/Triggers/EventTriggersList/EventTriggers.constants.ts and matched the included restricted event-trigger body. These scripts add no live grants/settings or resources by being included. The user must use the separately verified new target only for recovery. No dump, password, secret URL or real backup artifact is shipped in the source archive.
+
+Patch checks:48unit,lint,typecheck and production build pass again. Full248DB/24Chrome-per-flag application evidence is from the unchanged20 app/migrations immediately before this scripts/docs-only patch; the backup test itself was rerun after integration. Hosted signature/capture and actual Supabase Auth/Storage recovery remain separate, not claimed by the local adapters. Full MVP remains open until coordinated acceptance closes its remaining work.

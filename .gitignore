@@ -9,3 +9,7 @@ test-results/
 playwright-report/
 *.log
 .DS_Store
+
+backups/
+__pycache__/
+*.pyc

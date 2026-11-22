@@ -1,0 +1,14 @@
+-- Read-only preflight. Use public,pg_catalog search_path for stable deparsing.
+set search_path=public,pg_catalog;
+select coalesce(json_agg(d order by d),'[]') from (
+ select 'column|'||c.relname||'|'||a.attname||'|'||format_type(a.atttypid,a.atttypmod)||'|'||a.attnotnull::text||'|'||coalesce(pg_get_expr(ad.adbin,ad.adrelid),'') d from pg_class c join pg_namespace n on n.oid=c.relnamespace join pg_attribute a on a.attrelid=c.oid left join pg_attrdef ad on ad.adrelid=c.oid and ad.adnum=a.attnum where n.nspname='public' and c.relkind='r' and a.attnum>0 and not a.attisdropped
+ union all select 'constraint|'||c.relname||'|'||x.conname||'|'||pg_get_constraintdef(x.oid) from pg_constraint x join pg_class c on c.oid=x.conrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname='public'
+ union all select 'function|'||pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'
+ union all select 'policy|'||schemaname||'|'||tablename||'|'||policyname||'|'||roles::text||'|'||cmd||'|'||coalesce(qual,'')||'|'||coalesce(with_check,'') from pg_policies where schemaname='public' or (schemaname='storage' and policyname like 'dress_images_%')
+ union all select 'trigger|'||pg_get_triggerdef(t.oid) from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and not t.tgisinternal
+ union all select 'rls|'||relname||'|'||relrowsecurity::text||'|'||relforcerowsecurity::text from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r'
+ union all select 'table_grant|'||c.relname||'|'||coalesce(r.rolname,'PUBLIC')||'|'||a.privilege_type||'|'||a.is_grantable::text from pg_class c join pg_namespace n on n.oid=c.relnamespace cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a left join pg_roles r on r.oid=a.grantee where n.nspname='public' and c.relkind='r' and (a.grantee=0 or r.rolname in ('anon','authenticated','service_role'))
+ union all select 'function_grant|'||p.oid::regprocedure::text||'|'||coalesce(r.rolname,'PUBLIC')||'|'||a.privilege_type||'|'||a.is_grantable::text from pg_proc p join pg_namespace n on n.oid=p.pronamespace cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a left join pg_roles r on r.oid=a.grantee where n.nspname='public' and (a.grantee=0 or r.rolname in ('anon','authenticated','service_role'))
+ union all select 'function_owner|'||p.oid::regprocedure::text||'|'||pg_get_userbyid(p.proowner) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'
+ union all select 'event|'||e.evtname||'|'||e.evtevent||'|'||e.evtenabled::text||'|'||pg_get_userbyid(e.evtowner)||'|'||array_to_string(array(select unnest(e.evttags) order by 1),',') from pg_event_trigger e join pg_proc p on p.oid=e.evtfoid join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'
+ ) descriptions;

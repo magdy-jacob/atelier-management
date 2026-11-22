@@ -1,0 +1,24 @@
+PASS fixture rows inserted into source instance A
+PASS SQL canonicalization preserves literal content, token boundaries and nullable-state differences
+PASS real backup capture: single snapshot, 4 Auth bindings, 2 independently listed Storage objects including unlinked paths.txt
+PASS failed Storage capture leaves no completed manifest or partial directory
+PASS unknown source schema rejected with no published backup
+PASS exact optional Studio profile accepts provider-only differences but rejects changed app policy
+PASS corrupted backup file fails integrity verification
+PASS Storage recovery uploads both objects and verifies bytes, rejects overwrite retry
+PASS single-snapshot custom-format pg_dump completed
+PASS existing-identity confirmation-state mismatch fails closed without update
+PASS path 1: data-only pg_restore into migration-built schema
+PASS path 1: original identities, completed-job Auth bindings and profile versions preserved
+PASS all-FK integrity sweep succeeds and deliberately missing Auth parent fails closed
+PASS existing-identity confirmation-state mismatch fails closed without update
+PASS Studio-profile restore: original identities, completed-job Auth bindings and profile versions preserved
+PASS actual Studio-profile archive round-trip:24 tables identical plus reviewed provider function/event configuration
+PASS per-table content identical on 24 public tables for the migration restore path
+PASS catalog objects match after restore: 39 functions, 26 policies, 38 triggers
+PASS restored instance still enforces RLS for anonymous role
+RESULT PASS: backup/restore round-trip verification complete
+
+Negative missing-migrations run: exit1
+FAIL unexpected error relation "public.settings" does not exist
+RESULT FAIL: 1 failing check(s)

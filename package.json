@@ -1,6 +1,6 @@
 {
   "name": "atelier",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,7 +11,8 @@
     "test:e2e": "playwright test",
     "typecheck": "next typegen && tsc --noEmit",
     "test:db": "node tests/database.mjs",
-    "format": "prettier --write src tests docs *.ts *.json README.md"
+    "format": "prettier --write src tests docs *.ts *.json README.md",
+    "test:backup": "node tests/backup-restore.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

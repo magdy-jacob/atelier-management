@@ -269,6 +269,9 @@ test("admin summary has explicit money definitions and remains protected", async
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/demo/admin");
   await expect(
+    page.getByRole("note", { name: "نسخة اختبار فقط" }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("heading", { name: "لوحة الأدمن" }),
   ).toBeVisible();
   await expect(

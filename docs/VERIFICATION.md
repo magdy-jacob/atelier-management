@@ -85,3 +85,9 @@ Inventory action-state ownership remains stable across a version refresh; form D
 Migration 5 provides an admin-only aggregate RPC. No row limit is used to approximate financial totals. The UI separates period receipt totals/added fee totals from all-date current outstanding amounts and operational status counts. It does not claim net revenue or profit. Amount aggregates cross the JSON boundary as integer-piaster strings and are formatted with BigInt, including a test above JavaScript's safe-number limit.
 
 The local PostgreSQL suite passes 40 checks, including employee denial, anonymous function-execute denial, actual aggregate reconciliation, invalid period denial and a Cairo-versus-UTC midnight boundary check. Twenty-one unit tests, eight Chrome scenarios, lint, typecheck and production build pass. Both dashboard previews including the actual shared period-filter layout are visually inspected on desktop/mobile. This does not replace live project acceptance for migration 5 or dashboard/period role checks. Saved notification read-state, handover/return, refunds and account management are still incomplete.
+
+## Prototype guard update 0.7.0
+
+A sticky non-operational test notice appears on every route. Prototype mode is fail-closed unless explicitly set false. It blocks booking/payment server actions and their enabled state, and sets noindex/nofollow metadata. Neither a banner nor noindex is access control; the deployment owner must verify protection on every deployment URL before exposure. The database booking gate must stay false and no real customer or financial data should be entered. Build and runtime environment settings must match.
+
+Twenty-two unit tests and the eight-scenario browser run pass with prototype mode enabled, along with lint, typecheck and production build. Schema is unchanged from v0.6.0. This is prototype readiness work, not a hosting-terms conclusion or complete-MVP acceptance.

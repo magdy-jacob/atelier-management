@@ -1,3 +1,4 @@
+import { prototypeEnabled } from "./prototype";
 import "server-only";
 import { z } from "zod";
 import type { supabaseServer } from "./supabase/server";
@@ -20,6 +21,7 @@ export async function getBookingConfig(
 }
 export function bookingConfigReady(c: BookingConfig | null) {
   return !!(
+    !prototypeEnabled() &&
     c?.live_bookings_enabled &&
     c.date_precision === "day" &&
     c.business_timezone === "Africa/Cairo" &&

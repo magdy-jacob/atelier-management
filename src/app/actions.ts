@@ -1,4 +1,5 @@
 "use server";
+import { prototypeEnabled } from "@/lib/prototype";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -249,6 +250,10 @@ export async function createRealBooking(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
+  if (prototypeEnabled())
+    return {
+      error: "هذه نسخة اختبار فقط. تسجيل الحجوزات والدفعات الفعلية معطل.",
+    };
   const parsed = z
     .object({
       request_id: z.uuid(),
@@ -357,6 +362,10 @@ export async function recordRealPayment(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
+  if (prototypeEnabled())
+    return {
+      error: "هذه نسخة اختبار فقط. تسجيل الحجوزات والدفعات الفعلية معطل.",
+    };
   const parsed = z
     .object({
       request_id: z.uuid(),

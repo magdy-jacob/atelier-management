@@ -47,6 +47,15 @@ export default async function Workspace({
       .order("starts_on", { ascending: false })
       .limit(25),
   ]);
+  const cleanup =
+    profile.role === "admin"
+      ? await db
+          .from("image_deletion_jobs")
+          .select("id,dress_id,dresses(name)", { count: "exact" })
+          .eq("status", "pending")
+          .order("created_at")
+          .limit(10)
+      : null;
   return (
     <>
       <Header />
@@ -136,6 +145,40 @@ export default async function Workspace({
           وتقارير أخرى ضمن التطوير. لا تستخدم بيانات عملاء حقيقية قبل اختبارات
           القبول.
         </p>
+        {cleanup?.error && (
+          <p
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-5 text-xs leading-7 text-red-900"
+          >
+            تعذر التحقق من ملفات صور تنتظر التنظيف. أعد تحميل مساحة العمل؛ لم
+            نعتبر الملفات ممسوحة.
+          </p>
+        )}
+        {!!cleanup?.count && (
+          <section className="studio-card space-y-4 border-red-200 p-5">
+            <h2 className="text-sm">تنظيف ملفات صور معلق ({cleanup.count})</h2>
+            <p className="text-xs leading-7 text-muted-foreground">
+              الصور أُزيلت من الكتالوج، لكن مسح ملفاتها لم يُؤكد. افتح الفستان
+              لإعادة محاولة التنظيف. يُعرض هنا أول ١٠ طلبات فقط.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {cleanup.data?.map((job) => {
+                const d = Array.isArray(job.dresses)
+                  ? job.dresses[0]
+                  : job.dresses;
+                return (
+                  <Link
+                    key={job.id}
+                    className="rounded-full border px-4 py-2 text-xs underline underline-offset-4"
+                    href={`/workspace/dresses/${job.dress_id}`}
+                  >
+                    {d?.name ?? "فتح الفستان"}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
         {(categoryError || dressError || bookingError) && (
           <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">
             تعذر تحميل بعض البيانات. راجع تهيئة قاعدة البيانات والصلاحيات.

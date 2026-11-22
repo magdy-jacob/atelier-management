@@ -33,6 +33,13 @@ export default function InventoryPreview() {
             public_availability: d.availability,
             archived: false,
           }}
+          cleanupJobs={[
+            {
+              id: "90000000-0000-4000-8000-000000000001",
+              dress_id: "90000000-0000-4000-8000-000000000002",
+              created_at: "2026-12-05T10:00:00Z",
+            },
+          ]}
           categories={[
             { id: "evening", name: "سهرة" },
             { id: "engagement", name: "خطوبة" },

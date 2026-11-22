@@ -680,3 +680,48 @@ test("receipt report explains its cash basis and downloads only reconciled synth
   await page.goto("/workspace/reports/download?from=2026-12-01&to=2026-12-05");
   await expect(page).toHaveURL(/login/);
 });
+
+test("image removal preview requires separate confirmation, never deletes and explains durable cleanup", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/inventory");
+  await page.getByText("حذف هذه الصورة", { exact: true }).first().click();
+  await page
+    .getByRole("checkbox", {
+      name: "أؤكد حذف هذه الصورة وملفها، وليس الفستان أو حجوزاته.",
+      exact: true,
+    })
+    .check();
+  await expect(
+    page.getByRole("button", { name: "الحذف معطل في المعاينة", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("heading", { name: /تنظيف ملفات معلق/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "إعادة التنظيف معطلة في المعاينة",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(/قد تبقى نسخة مخبأة من رابط قديم/).first(),
+  ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/image-delete-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/image-delete-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+});

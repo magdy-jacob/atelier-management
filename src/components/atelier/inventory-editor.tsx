@@ -1,5 +1,6 @@
 "use client";
 import { ImageOrdering } from "./image-ordering";
+import { ImageCleanupJobs, type CleanupJob } from "./image-deletion";
 import { useActionState, useState } from "react";
 import { Archive, ImagePlus, Save, RotateCcw } from "lucide-react";
 import {
@@ -51,13 +52,16 @@ export function InventoryEditor({
   images,
   preview = false,
   readOnly = false,
+  cleanupJobs = [],
 }: {
   dress: EditableDress;
   categories: { id: string; name: string }[];
   images: InventoryImage[];
   preview?: boolean;
   readOnly?: boolean;
+  cleanupJobs?: CleanupJob[];
 }) {
+  const [deleteFeedback, setDeleteFeedback] = useState<ActionState>({});
   const [orderSuccess, setOrderSuccess] = useState("");
   const [editState, editAction, editing] = useActionState(editDress, initial);
   const [archiveState, archiveAction, archiving] = useActionState(
@@ -226,6 +230,7 @@ export function InventoryEditor({
           </span>
         </div>
         <Message state={{ success: orderSuccess }} />
+        <Message state={deleteFeedback} />
         {images.length ? (
           <div className="mb-7">
             <ImageOrdering
@@ -236,6 +241,7 @@ export function InventoryEditor({
               images={images}
               preview={preview}
               readOnly={readOnly}
+              onDeleteResult={setDeleteFeedback}
               onSuccess={setOrderSuccess}
               onChanged={() => setOrderSuccess("")}
             />
@@ -245,6 +251,13 @@ export function InventoryEditor({
             <ImagePlus size={32} strokeWidth={1} />
             <p className="text-xs">لم تُضف صور لهذا الفستان بعد</p>
           </div>
+        )}
+        {!readOnly && (
+          <ImageCleanupJobs
+            jobs={cleanupJobs}
+            preview={preview}
+            onResult={setDeleteFeedback}
+          />
         )}
         {!readOnly && (
           <form
@@ -284,7 +297,7 @@ export function InventoryEditor({
             </Button>
             <p className="text-[10px] leading-6 text-muted-foreground">
               الصور الجديدة تُضاف في نهاية القائمة. يمكن حفظ ترتيبها وتغيير
-              الرئيسية أعلاه. حذف الصور لم يُوصل بعد.
+              الرئيسية أعلاه. الحذف بتأكيد منفصل، وأي مسح ملف معلق سيظهر هنا.
             </p>
           </form>
         )}

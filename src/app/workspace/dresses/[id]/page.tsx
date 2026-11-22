@@ -38,6 +38,17 @@ export default async function ManageDress({
   if ((error && error.code !== "PGRST116") || categoriesError || photosError)
     throw new Error("تعذر تحميل بيانات الفستان أو صوره.");
   if (!dress) notFound();
+  const cleanup =
+    profile.role === "admin"
+      ? await db
+          .from("image_deletion_jobs")
+          .select("id,dress_id,created_at")
+          .eq("dress_id", id)
+          .eq("status", "pending")
+          .order("created_at")
+      : null;
+  if (cleanup?.error)
+    throw new Error("تعذر التحقق من ملفات الصور المعلقة؛ أعد المحاولة.");
   const images = (photos ?? []).map((image) => ({
     ...image,
     url: db.storage.from("dress-images").getPublicUrl(image.path).data
@@ -65,6 +76,7 @@ export default async function ManageDress({
           categories={categories ?? []}
           images={images}
           readOnly={profile.role !== "admin"}
+          cleanupJobs={cleanup?.data ?? []}
         />
       </main>
     </>

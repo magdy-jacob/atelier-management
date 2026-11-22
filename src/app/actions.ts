@@ -767,3 +767,149 @@ export async function reorderDressImages(
   revalidatePath(`/dresses/${parsed.data.id}`);
   return { success: "تم حفظ ترتيب الصور؛ الأولى هي الرئيسية في الكتالوج." };
 }
+
+async function runImageCleanup(
+  db: Awaited<ReturnType<typeof supabaseServer>>,
+  job: { id: string; path: string; dress_id: string; status: string },
+): Promise<ActionState> {
+  const safeJob = z
+    .object({
+      id: z.uuid(),
+      dress_id: z.uuid(),
+      path: z
+        .string()
+        .min(1)
+        .refine(
+          (path) =>
+            !path.startsWith("/") &&
+            !path
+              .split("/")
+              .some((part) => part === "" || part === "." || part === "..") &&
+            !/[\x00-\x1f]/.test(path),
+        ),
+      status: z.enum(["pending", "completed"]),
+    })
+    .safeParse(job);
+  if (!safeJob.success)
+    return { error: "مسار تنظيف غير صالح أو غير متحقق منه؛ لم نمسح أي ملف." };
+  const refresh = () => {
+    revalidatePath("/");
+    revalidatePath("/workspace");
+    revalidatePath(`/workspace/dresses/${job.dress_id}`);
+    revalidatePath(`/dresses/${job.dress_id}`);
+  };
+  if (job.status === "completed") {
+    refresh();
+    return { success: "حذف هذه الصورة وملفها مؤكد بالفعل." };
+  }
+  const { finishImageCleanup } = await import("@/lib/image-cleanup");
+  const status = await finishImageCleanup({
+    remove: async () => {
+      const { error } = await db.storage
+        .from("dress-images")
+        .remove([job.path]);
+      if (error) throw error;
+    },
+    exists: async () => {
+      const result = await db.storage.from("dress-images").exists(job.path);
+      return result.data;
+    },
+    complete: async () => {
+      const { error } = await db.rpc("complete_dress_image_delete", {
+        p_job_id: job.id,
+      });
+      if (error) throw error;
+    },
+  });
+  refresh();
+  return status === "completed"
+    ? {
+        success:
+          "أُزيلت الصورة من الكتالوج وتأكد مسح ملفها. قد تبقى نسخة مخبأة لدى رابط قديم مؤقتًا.",
+      }
+    : {
+        error:
+          "أُزيلت الصورة من الكتالوج، لكن مسح ملفها لم يُؤكد. طلب التنظيف محفوظ وسيظهر هنا للأدمن لإعادة المحاولة، ولم يُدّعَ اكتمال مسح الملف.",
+      };
+}
+export async function deleteDressImage(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "غير مسموح" };
+  const p = z
+    .object({
+      id: z.uuid(),
+      image_id: z.uuid(),
+      request_id: z.uuid(),
+      version: z.coerce.number().int().positive(),
+      confirm: z.literal("on"),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!p.success) return { error: "اختر الصورة وأكد حذفها صراحة." };
+  const { data, error } = await db.rpc("queue_dress_image_delete", {
+    p_request_id: p.data.request_id,
+    p_dress_id: p.data.id,
+    p_image_id: p.data.image_id,
+    p_expected_version: p.data.version,
+    p_confirm: true,
+  });
+  if (error) {
+    const prior = await db
+      .from("image_deletion_jobs")
+      .select("id,dress_id,image_id,recorded_by,path,status")
+      .eq("request_id", p.data.request_id)
+      .maybeSingle();
+    if (
+      !prior.error &&
+      prior.data &&
+      prior.data.dress_id === p.data.id &&
+      prior.data.image_id === p.data.image_id &&
+      prior.data.recorded_by === profile.id
+    )
+      return runImageCleanup(db, prior.data);
+    revalidatePath("/workspace");
+    revalidatePath(`/workspace/dresses/${p.data.id}`);
+    return {
+      error:
+        error.message.includes("stale_dress_version") ||
+        error.message.includes("image_missing_refresh")
+          ? "تغيرت الصور أو البيانات. حدّث الصفحة وراجع الصورة قبل تأكيد جديد."
+          : "تعذر تأكيد إزالة الصورة. حدّث الصفحة للتحقق من الصور وطلبات التنظيف قبل إعادة المحاولة؛ لم نُنشئ طلب حذف بديلًا.",
+    };
+  }
+  const parsed = z
+    .object({
+      id: z.uuid(),
+      dress_id: z.uuid(),
+      path: z.string().min(1),
+      status: z.enum(["pending", "completed"]),
+    })
+    .safeParse(data);
+  if (!parsed.success)
+    return {
+      error:
+        "تعذر التحقق من نتيجة الإزالة. حدّث الصفحة وتحقق من قائمة التنظيف؛ لن نمسح مسارًا غير متحقق منه.",
+    };
+  return runImageCleanup(db, parsed.data);
+}
+export async function retryImageCleanup(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "غير مسموح" };
+  const id = z.uuid().safeParse(form.get("job_id"));
+  if (!id.success) return { error: "طلب تنظيف غير صحيح." };
+  const { data, error } = await db
+    .from("image_deletion_jobs")
+    .select("id,dress_id,path,status")
+    .eq("id", id.data)
+    .maybeSingle();
+  if (error || !data)
+    return {
+      error: "تعذر التحقق من طلب التنظيف أو الصلاحيات. لم نمسح أي ملف.",
+    };
+  return runImageCleanup(db, data);
+}

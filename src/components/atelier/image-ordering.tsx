@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { ImageDeleteForm } from "./image-deletion";
 import { useActionState, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { reorderDressImages, type ActionState } from "@/app/actions";
@@ -14,6 +15,7 @@ export function ImageOrdering({
   readOnly = false,
   onSuccess,
   onChanged,
+  onDeleteResult,
 }: {
   dressId: string;
   version: number;
@@ -23,6 +25,7 @@ export function ImageOrdering({
   readOnly?: boolean;
   onSuccess?: (message: string) => void;
   onChanged?: () => void;
+  onDeleteResult?: (result: ActionState) => void;
 }) {
   const [ordered, setOrdered] = useState(images);
   const [state, action, pending] = useActionState(
@@ -102,6 +105,16 @@ export function ImageOrdering({
                   تأخير
                 </Button>
               </div>
+            )}
+            {!readOnly && (
+              <ImageDeleteForm
+                dressId={dressId}
+                imageId={image.id}
+                version={version}
+                preview={preview}
+                disabled={changed || pending}
+                onResult={onDeleteResult}
+              />
             )}
           </article>
         ))}

@@ -1858,6 +1858,181 @@ try {
       );
     },
   );
+  await check(
+    "image deletion separates durable metadata removal from verified Storage cleanup",
+    async () => {
+      const dress = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+      const image = (
+        await client.query(
+          "select id,path from public.dress_images where dress_id=$1 order by sort_order,id limit 1",
+          [dress],
+        )
+      ).rows[0];
+      const version = (
+        await client.query("select version from public.dresses where id=$1", [
+          dress,
+        ])
+      ).rows[0].version;
+      const request = "abababab-abab-4bab-8bab-abababababab";
+      await client.query(
+        "insert into storage.objects(bucket_id,name) values('dress-images',$1)",
+        [image.path],
+      );
+      for (const uid of [employee, other, inactive])
+        await deny(
+          uid,
+          "select public.queue_dress_image_delete($1,$2,$3,$4,true)",
+          [request, dress, image.id, version],
+          /not_authorized/,
+        );
+      await deny(
+        admin,
+        "select public.queue_dress_image_delete($1,$2,$3,$4,false)",
+        [request, dress, image.id, version],
+        /explicit_delete_confirmation_required/,
+      );
+      await deny(
+        admin,
+        "select public.queue_dress_image_delete($1,$2,$3,$4,true)",
+        [request, dress, image.id, version - 1],
+        /stale_dress_version/,
+      );
+      await deny(
+        admin,
+        "select public.queue_dress_image_delete($1,$2,$3,$4,true)",
+        [request, dress, admin, version],
+        /image_missing_refresh/,
+      );
+      const race = await parallelAsUser(
+        "select public.queue_dress_image_delete($1,$2,$3,$4,true) d",
+        [
+          [request, dress, image.id, version],
+          [request, dress, image.id, version],
+        ],
+        admin,
+      );
+      assert.equal(race.filter((r) => r.ok).length, 2);
+      const job = race[0].value.rows[0].d;
+      assert.equal(job.id, race[1].value.rows[0].d.id);
+      assert.equal(job.status, "pending");
+      assert.equal(job.path, image.path);
+      assert.equal(
+        (
+          await client.query(
+            "select count(*)::int n from public.dress_images where id=$1",
+            [image.id],
+          )
+        ).rows[0].n,
+        0,
+      );
+      assert.equal(
+        (
+          await client.query("select version from public.dresses where id=$1", [
+            dress,
+          ])
+        ).rows[0].version,
+        version + 1,
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select count(*)::int n from public.image_deletion_jobs",
+          )
+        ).rows[0].n,
+        0,
+      );
+      await deny(
+        admin,
+        "update public.image_deletion_jobs set status='completed',completed_at=now() where id=$1",
+        [job.id],
+        /permission denied/,
+      );
+      await deny(
+        employee,
+        "select public.complete_dress_image_delete($1)",
+        [job.id],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "select public.complete_dress_image_delete($1)",
+        [job.id],
+        /storage_object_still_present/,
+      );
+      await deny(
+        admin,
+        "insert into public.dress_images(dress_id,path) values($1,$2)",
+        [dress, image.path],
+        /image_path_retired/,
+      );
+      await deny(
+        admin,
+        "select public.queue_dress_image_delete($1,$2,$3,$4,true)",
+        [request, dress, admin, version],
+        /request_id_conflict/,
+      );
+      const before = (
+        await client.query("select count(*)::int n from public.activity_logs")
+      ).rows[0].n;
+      const retry = (
+        await asUser(
+          admin,
+          "select public.queue_dress_image_delete($1,$2,$3,$4,true) d",
+          [request, dress, image.id, version],
+        )
+      ).rows[0].d;
+      assert.equal(retry.id, job.id);
+      assert.equal(
+        (await client.query("select count(*)::int n from public.activity_logs"))
+          .rows[0].n,
+        before,
+      );
+      await client.query(
+        "delete from storage.objects where bucket_id='dress-images' and name=$1",
+        [image.path],
+      );
+      await asUser(admin, "select public.complete_dress_image_delete($1)", [
+        job.id,
+      ]);
+      assert.equal(
+        (
+          await client.query(
+            "select status from public.image_deletion_jobs where id=$1",
+            [job.id],
+          )
+        ).rows[0].status,
+        "completed",
+      );
+      const completedCount = (
+        await client.query("select count(*)::int n from public.activity_logs")
+      ).rows[0].n;
+      await asUser(admin, "select public.complete_dress_image_delete($1)", [
+        job.id,
+      ]);
+      assert.equal(
+        (await client.query("select count(*)::int n from public.activity_logs"))
+          .rows[0].n,
+        completedCount,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.queue_dress_image_delete(uuid,uuid,uuid,int,boolean)','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_table_privilege('anon','public.image_deletion_jobs','SELECT') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,

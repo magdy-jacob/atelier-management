@@ -23,7 +23,7 @@ export const sampleDresses: Dress[] = [
     size: "M",
     category: "سهرة",
     availability: "available",
-    image: "/dresses/sage.svg",
+    image: "/dresses/sage-demo.webp",
   },
   {
     id: "rose",
@@ -33,7 +33,7 @@ export const sampleDresses: Dress[] = [
     size: "S",
     category: "خطوبة",
     availability: "reserved",
-    image: "/dresses/rose.svg",
+    image: "/dresses/rose-demo.webp",
   },
   {
     id: "ivory",
@@ -43,7 +43,7 @@ export const sampleDresses: Dress[] = [
     size: "M",
     category: "أفراح",
     availability: "available",
-    image: "/dresses/ivory.svg",
+    image: "/dresses/ivory-demo.webp",
   },
   {
     id: "midnight",
@@ -53,7 +53,7 @@ export const sampleDresses: Dress[] = [
     size: "L",
     category: "سهرة",
     availability: "available",
-    image: "/dresses/midnight.svg",
+    image: "/dresses/midnight-demo.webp",
   },
   {
     id: "plum",
@@ -63,7 +63,7 @@ export const sampleDresses: Dress[] = [
     size: "S",
     category: "خطوبة",
     availability: "unavailable",
-    image: "/dresses/plum.svg",
+    image: "/dresses/plum-demo.webp",
   },
   {
     id: "gold",
@@ -73,7 +73,7 @@ export const sampleDresses: Dress[] = [
     size: "L",
     category: "سهرة",
     availability: "available",
-    image: "/dresses/gold.svg",
+    image: "/dresses/gold-demo.webp",
   },
 ];
 export type Booking = {

@@ -1,0 +1,54 @@
+{
+  "synthetic": true,
+  "commercial_inventory": false,
+  "items": [
+    {
+      "key": "sage",
+      "dress_id": "d0000000-0000-4000-8000-000000000001",
+      "file": "public/dresses/sage-demo.webp",
+      "storage_path": "prototype-demo/sage/main.webp",
+      "generated": true,
+      "real_inventory": false
+    },
+    {
+      "key": "rose",
+      "dress_id": "d0000000-0000-4000-8000-000000000002",
+      "file": "public/dresses/rose-demo.webp",
+      "storage_path": "prototype-demo/rose/main.webp",
+      "generated": true,
+      "real_inventory": false
+    },
+    {
+      "key": "ivory",
+      "dress_id": "d0000000-0000-4000-8000-000000000003",
+      "file": "public/dresses/ivory-demo.webp",
+      "storage_path": "prototype-demo/ivory/main.webp",
+      "generated": true,
+      "real_inventory": false
+    },
+    {
+      "key": "midnight",
+      "dress_id": "d0000000-0000-4000-8000-000000000004",
+      "file": "public/dresses/midnight-demo.webp",
+      "storage_path": "prototype-demo/midnight/main.webp",
+      "generated": true,
+      "real_inventory": false
+    },
+    {
+      "key": "plum",
+      "dress_id": "d0000000-0000-4000-8000-000000000005",
+      "file": "public/dresses/plum-demo.webp",
+      "storage_path": "prototype-demo/plum/main.webp",
+      "generated": true,
+      "real_inventory": false
+    },
+    {
+      "key": "gold",
+      "dress_id": "d0000000-0000-4000-8000-000000000006",
+      "file": "public/dresses/gold-demo.webp",
+      "storage_path": "prototype-demo/gold/main.webp",
+      "generated": true,
+      "real_inventory": false
+    }
+  ]
+}

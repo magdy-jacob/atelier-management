@@ -57,7 +57,7 @@ export function DemoNotice({ short = false }: { short?: boolean }) {
     <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] leading-6 text-amber-950">
       {short
         ? "بيئة عرض فقط • كل الأسماء والأرقام والعمليات تجريبية"
-        : "نسخة أولية للعرض • بيانات ورسومات تجريبية وليست مخزونًا أو حجوزات حقيقية • اسم الأتيليه قابل للتغيير"}
+        : "نسخة أولية للعرض • بيانات وصور مولدة للتجربة وليست مخزونًا أو حجوزات حقيقية • اسم الأتيليه قابل للتغيير"}
     </div>
   );
 }

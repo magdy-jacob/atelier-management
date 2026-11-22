@@ -422,3 +422,41 @@ export async function recordRealPayment(
     nextRequestId: crypto.randomUUID(),
   };
 }
+
+export async function markNotificationRead(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "هذا الإجراء للأدمن فقط." };
+  const { validDay } = await import("@/lib/domain");
+  const parsed = z
+    .object({
+      booking_id: z.uuid(),
+      kind: z.enum(["outgoing", "incoming", "overdue"]),
+      event_on: z.string().refine(validDay),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return { error: "بيانات التنبيه غير صحيحة. أعد تحميل الصفحة." };
+  const d = parsed.data;
+  const { error } = await db.rpc("mark_notification_read", {
+    p_booking_id: d.booking_id,
+    p_kind: d.kind,
+    p_event_on: d.event_on,
+  });
+  if (error)
+    return {
+      error: error.message.includes("notification_not_active")
+        ? "التنبيه لم يعد نشطًا؛ حدّث الصفحة لمراجعة الحالة."
+        : "تعذر تأكيد القراءة. أعد نفس المحاولة؛ تكرارها لا ينشئ سجلًا مكررًا.",
+    };
+  for (const path of [
+    "/workspace/notifications",
+    "/workspace/notifications/outgoing",
+    "/workspace/notifications/incoming",
+    "/workspace/notifications/overdue",
+  ])
+    revalidatePath(path);
+  return { success: "تم التعليم كمقروء. يظل التنبيه ظاهرًا حتى معالجة سببه." };
+}

@@ -1,0 +1,12 @@
+# Synthetic review dataset
+
+These are invented test records and generated product images, not real stock, people, receipts, debt or fees. Do not use this seed for commercial operation. Keep `ATELIER_PROTOTYPE_MODE=true` at build/runtime, the database booking gate false, and all deployment URLs protected.
+
+The owner requested dummy data and pictures for review. The seed is an explicit setup action, not a migration or auto-start task. It creates six labelled dresses, three labelled categories, five dummy customers/bookings, five fictitious receipt entries and one fictitious fee. Employee-assigned fixtures remain RLS-scoped. Relative dates use the actual Cairo day: tomorrow preparation, today incoming, overdue return and future/history examples. No real contact route is used. No Auth user or password is created.
+
+1. Resolve the already verified active app admin and employee profile IDs from the live project. Do not select an arbitrary first profile. In the SAME database session, set `atelier.demo_admin_id` and `atelier.demo_employee_id` to those UUIDs with parameterized `set_config` calls.
+2. Validate `assets.json`, upload its six WebP files to `dress-images` at the exact `storage_path` values, then verify image delivery. They are original generated sample dresses, not photographs of actual inventory. Only these non-private sample images belong in the public catalogue bucket.
+3. Review and explicitly execute `seed.demo.sql`. It requires those exact IDs to have the intended active roles, a disabled booking gate, Cairo/day settings, and no non-demo inventory. Fixed IDs plus conflict handling avoid duplicate records on a repeat. A repeat does not reset existing edited fixtures or shift their dates.
+4. Re-read row counts and the disabled gate, check customer/booking labels, public catalogue image rendering and RLS. The expected seeded full dataset has six dresses, five customers, five bookings, five receipts, EGP 11,000 fictitious recorded receipts, EGP 50 fictitious fees and EGP 5,550 current outstanding. These are validation numbers only, never actual business figures. Date-period totals depend on the selected range.
+
+Do not silently clear unrelated records to make a guard pass. Ask the owner or return the conflict. Never run blanket cleanup on a project that may contain non-demo work. Back up and target known fixture IDs if the owner later asks to remove this dataset.

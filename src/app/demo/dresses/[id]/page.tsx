@@ -68,7 +68,7 @@ export default async function DressDetails({
             </div>
             {demo && (
               <p className="mt-5 text-xs text-muted-foreground">
-                هذه بيانات ورسم تجريبيان. تفاصيل التواصل لم تُضف بعد.
+                هذه بيانات وصورة مولدة للتجربة فقط. تفاصيل التواصل لم تُضف بعد.
               </p>
             )}
           </div>

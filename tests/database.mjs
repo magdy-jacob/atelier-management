@@ -655,6 +655,132 @@ try {
       assert.equal(second.receipt_piasters, rows[1].amount);
     },
   );
+  await check(
+    "explicit demo seed uses verified actors, is repeat-safe and reconciles synthetic totals",
+    async () => {
+      const seed = await fs.readFile(
+        new URL("../supabase/demo/seed.demo.sql", import.meta.url),
+        "utf8",
+      );
+      await client.query(
+        "select set_config('atelier.demo_admin_id',$1,false),set_config('atelier.demo_employee_id',$2,false)",
+        [admin, employee],
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=false where id=true",
+      );
+      await assert.rejects(
+        () => client.query(seed),
+        /non_demo_inventory_present_abort/,
+      );
+      await client.query("rollback");
+      await client.query("truncate public.categories,public.customers cascade");
+      await client.query(seed);
+      await client.query(seed);
+      assert.equal(
+        (await client.query("select count(*)::int n from public.dresses"))
+          .rows[0].n,
+        6,
+      );
+      assert.equal(
+        (await client.query("select count(*)::int n from public.payments"))
+          .rows[0].n,
+        5,
+      );
+      assert.equal(
+        (await asUser(employee, "select count(*)::int n from public.bookings"))
+          .rows[0].n,
+        2,
+      );
+      const d = (
+        await asUser(
+          admin,
+          "select public.admin_dashboard((now() at time zone 'Africa/Cairo')::date-30,(now() at time zone 'Africa/Cairo')::date) as d",
+        )
+      ).rows[0].d;
+      assert.equal(d.receipt_piasters, "1100000");
+      assert.equal(d.outstanding_piasters, "555000");
+    },
+  );
+  await deny(
+    employee,
+    "select public.get_admin_notifications()",
+    [],
+    /not_authorized/,
+  );
+  await check(
+    "read-marked operational notification stays active until cause resolves",
+    async () => {
+      let d = (
+        await asUser(admin, "select public.get_admin_notifications() as d")
+      ).rows[0].d;
+      assert.equal(d.total, 3);
+      assert.equal(d.items.filter((i) => i.kind === "overdue").length, 1);
+      const alert = d.items.find((i) => i.kind === "outgoing");
+      await asUser(admin, "select public.mark_notification_read($1,$2,$3)", [
+        alert.booking_id,
+        alert.kind,
+        alert.event_on,
+      ]);
+      await asUser(admin, "select public.mark_notification_read($1,$2,$3)", [
+        alert.booking_id,
+        alert.kind,
+        alert.event_on,
+      ]);
+      d = (await asUser(admin, "select public.get_admin_notifications() as d"))
+        .rows[0].d;
+      assert.equal(d.total, 3);
+      assert.ok(d.items.find((i) => i.booking_id === alert.booking_id).read_at);
+      assert.equal(
+        (
+          await client.query(
+            "select count(*)::int n from public.notification_reads",
+          )
+        ).rows[0].n,
+        1,
+      );
+      await deny(
+        employee,
+        "select public.mark_notification_read($1,$2,$3)",
+        [alert.booking_id, alert.kind, alert.event_on],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "select public.mark_notification_read($1,'incoming',$2)",
+        [alert.booking_id, alert.event_on],
+        /notification_not_active/,
+      );
+      assert.equal(
+        (await asUser(employee, "select * from public.notification_reads"))
+          .rowCount,
+        0,
+      );
+      const late = (
+        await asUser(
+          admin,
+          "select public.get_admin_notifications('overdue') as d",
+        )
+      ).rows[0].d;
+      assert.equal(late.total, 1);
+      assert.equal(late.items[0].kind, "overdue");
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.get_admin_notifications(text)','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      await client.query(
+        "update public.bookings set status='out' where id=$1",
+        [alert.booking_id],
+      );
+      d = (await asUser(admin, "select public.get_admin_notifications() as d"))
+        .rows[0].d;
+      assert.equal(d.total, 2);
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,

@@ -91,3 +91,11 @@ The local PostgreSQL suite passes 40 checks, including employee denial, anonymou
 A sticky non-operational test notice appears on every route. Prototype mode is fail-closed unless explicitly set false. It blocks booking/payment server actions and their enabled state, and sets noindex/nofollow metadata. Neither a banner nor noindex is access control; the deployment owner must verify protection on every deployment URL before exposure. The database booking gate must stay false and no real customer or financial data should be entered. Build and runtime environment settings must match.
 
 Twenty-two unit tests and the eight-scenario browser run pass with prototype mode enabled, along with lint, typecheck and production build. Schema is unchanged from v0.6.0. This is prototype readiness work, not a hosting-terms conclusion or complete-MVP acceptance.
+
+## Saved notifications and review assets 0.8.0
+
+Six generated dress images were inspected and exported to metadata-free WebP sample assets. Catalogue screenshots now wait for lazy images to load before capture. These are invented products, not real inventory or licensed photographs of an existing designer's work.
+
+The explicit guarded demo seed was tested on local PostgreSQL for exact actor IDs/roles, non-demo conflict rejection, repeat safety, scoped employee fixtures and aggregate reconciliation. It is not an automatic migration. Live seeding and Storage delivery require separate verification by the deployment operator; do not remove persistent review data during disposable-fixture cleanup.
+
+Migration 6 adds per-admin notification read records, RLS, audit and role-checked RPCs. Marking read is retry-safe, does not remove an active cause, and rejects a wrong/expired event. Filtered pages are served from the protected RPC and disclose the 1000-item cap. The local suite passes 45 PostgreSQL checks, 22 unit tests and nine Chrome scenarios. Lint, typecheck, production build and npm audit pass. Actual desktop/mobile notification previews and updated catalogue pixels were inspected. These are local results, not the hosted notification acceptance.

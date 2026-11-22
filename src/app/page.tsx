@@ -45,8 +45,8 @@ export default async function Home() {
           </div>
           <div className="relative min-h-[350px] overflow-hidden rounded-t-[150px] bg-[#e9e9e0] sm:min-h-[450px] md:min-h-[520px]">
             <Image
-              src="/dresses/sage.svg"
-              alt="رسم تصوري لفستان سهرة أخضر، وليس صورة منتج"
+              src="/dresses/sage-demo.webp"
+              alt="صورة مولدة لفستان سهرة أخضر للتجربة، ليست من مخزون حقيقي"
               fill
               className="object-cover object-center"
               priority
@@ -57,7 +57,7 @@ export default async function Home() {
               <div>
                 <p className="mb-1 text-sm">جمالك في تفاصيلك</p>
                 <p className="text-[10px] text-muted-foreground">
-                  رسومات مبدئية، تُستبدل بصور الأتيليه
+                  صورة مولدة للتجربة، ليست مخزونًا حقيقيًا
                 </p>
               </div>
             </div>

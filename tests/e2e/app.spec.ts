@@ -7,6 +7,17 @@ test("catalogue, filters, product privacy, responsive layout", async ({
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await page.getByRole("heading", { name: "اختاري حكايتك" }).waitFor();
+  for (const image of await page.locator("img").all()) {
+    await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        image.evaluate(
+          (el: HTMLImageElement) => el.complete && el.naturalWidth > 0,
+        ),
+      )
+      .toBeTruthy();
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: "evidence/catalogue-desktop.png",
     fullPage: true,
@@ -296,5 +307,42 @@ test("admin summary has explicit money definitions and remains protected", async
     ),
   ).toBeTruthy();
   await page.goto("/workspace/dashboard");
+  await expect(page).toHaveURL(/login/);
+});
+
+test("notification center keeps read operational causes visible and filters types", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/notifications");
+  await expect(
+    page.getByRole("heading", { name: "مركز الإشعارات" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("مقروء، وما زال السبب قائمًا", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "تعليم كمقروء" }).first(),
+  ).toBeDisabled();
+  await page.screenshot({
+    path: "evidence/notifications-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/notifications");
+  await page.screenshot({
+    path: "evidence/notifications-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page
+    .getByRole("link", { name: "متأخر عن العودة", exact: true })
+    .click();
+  await expect(page.getByRole("article")).toHaveCount(1);
+  await page.goto("/workspace/notifications");
   await expect(page).toHaveURL(/login/);
 });

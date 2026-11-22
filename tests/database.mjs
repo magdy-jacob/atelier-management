@@ -1707,6 +1707,157 @@ try {
       );
     },
   );
+  await check(
+    "image reordering is exact-set, admin-only, versioned and retry-safe",
+    async () => {
+      const dress = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+      await asUser(
+        admin,
+        "insert into public.dresses(id,code,name,color,size,category_id) select $1,'IMAGE-ORDER','Image ordering fixture','pink','M',id from public.categories limit 1",
+        [dress],
+      );
+      const ids = (
+        await client.query(
+          "insert into public.dress_images(dress_id,path,sort_order) values($1,'local/order-a.webp',99),($1,'local/order-b.webp',99),($1,'local/order-c.webp',99) returning id,sort_order",
+          [dress],
+        )
+      ).rows;
+      assert.deepEqual(
+        ids.map((i) => i.sort_order),
+        [0, 1, 2],
+      );
+      const ordered = ids.map((i) => i.id),
+        desired = [ordered[2], ordered[0], ordered[1]];
+      const getVersion = async () =>
+        (
+          await client.query("select version from public.dresses where id=$1", [
+            dress,
+          ])
+        ).rows[0].version;
+      const before = await getVersion();
+      for (const uid of [employee, other, inactive])
+        await deny(
+          uid,
+          "select public.reorder_dress_images($1,$2,$3::uuid[])",
+          [dress, before, desired],
+          /not_authorized/,
+        );
+      await deny(
+        admin,
+        "update public.dress_images set sort_order=99 where dress_id=$1",
+        [dress],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "select public.reorder_dress_images($1,$2,$3::uuid[])",
+        [dress, before, [ordered[0], ordered[0], ordered[2]]],
+        /image_set_changed_refresh/,
+      );
+      await deny(
+        admin,
+        "select public.reorder_dress_images($1,$2,$3::uuid[])",
+        [dress, before, ordered.slice(0, 2)],
+        /image_set_changed_refresh/,
+      );
+      await deny(
+        admin,
+        "select public.reorder_dress_images($1,$2,$3::uuid[])",
+        [dress, before, [ordered[0], ordered[1], admin]],
+        /image_set_changed_refresh/,
+      );
+      await deny(
+        admin,
+        "select public.reorder_dress_images($1,$2,array[null::uuid])",
+        [dress, before],
+        /invalid_image_list/,
+      );
+      await deny(
+        admin,
+        "select public.reorder_dress_images($1,$2,$3::uuid[])",
+        [dress, before - 1, desired],
+        /stale_dress_version/,
+      );
+      const saved = (
+        await asUser(
+          admin,
+          "select public.reorder_dress_images($1,$2,$3::uuid[]) d",
+          [dress, before, desired],
+        )
+      ).rows[0].d;
+      assert.equal(saved.version, before + 1);
+      assert.equal(saved.unchanged, false);
+      assert.deepEqual(
+        (
+          await client.query(
+            "select id from public.dress_images where dress_id=$1 order by sort_order,id",
+            [dress],
+          )
+        ).rows.map((r) => r.id),
+        desired,
+      );
+      const count = (
+        await client.query("select count(*)::int n from public.activity_logs")
+      ).rows[0].n;
+      const retry = (
+        await asUser(
+          admin,
+          "select public.reorder_dress_images($1,$2,$3::uuid[]) d",
+          [dress, before, desired],
+        )
+      ).rows[0].d;
+      assert.equal(retry.unchanged, true);
+      assert.equal(retry.version, saved.version);
+      assert.equal(
+        (await client.query("select count(*)::int n from public.activity_logs"))
+          .rows[0].n,
+        count,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.reorder_dress_images(uuid,int,uuid[])','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      const race = await parallelAsUser(
+        "select public.reorder_dress_images($1,$2,$3::uuid[]) d",
+        [
+          [dress, saved.version, [ordered[0], ordered[1], ordered[2]]],
+          [dress, saved.version, [ordered[1], ordered[2], ordered[0]]],
+        ],
+        admin,
+      );
+      assert.equal(race.filter((r) => r.ok).length, 1);
+      assert.match(
+        race.find((r) => !r.ok).error.message,
+        /stale_dress_version/,
+      );
+      const now = await getVersion();
+      assert.equal(now, saved.version + 1);
+      const uploads = await parallelAsUser(
+        "insert into public.dress_images(dress_id,path,sort_order) values($1,$2,0) returning sort_order",
+        [
+          [dress, "local/concurrent-order-a.webp"],
+          [dress, "local/concurrent-order-b.webp"],
+        ],
+        admin,
+      );
+      assert.equal(uploads.filter((r) => r.ok).length, 2);
+      assert.deepEqual(
+        uploads.map((r) => r.value.rows[0].sort_order).sort((a, b) => a - b),
+        [3, 4],
+      );
+      assert.equal(await getVersion(), now + 2);
+      await deny(
+        admin,
+        "select public.reorder_dress_images($1,$2,$3::uuid[])",
+        [dress, now, desired],
+        /image_set_changed_refresh/,
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,

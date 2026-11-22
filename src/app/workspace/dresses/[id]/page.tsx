@@ -32,7 +32,8 @@ export default async function ManageDress({
       .from("dress_images")
       .select("id,path,sort_order")
       .eq("dress_id", id)
-      .order("sort_order"),
+      .order("sort_order")
+      .order("id"),
   ]);
   if ((error && error.code !== "PGRST116") || categoriesError || photosError)
     throw new Error("تعذر تحميل بيانات الفستان أو صوره.");

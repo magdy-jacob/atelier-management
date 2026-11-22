@@ -63,6 +63,12 @@ export function DemoNotice({ short = false }: { short?: boolean }) {
       {short
         ? "بيئة عرض فقط • كل الأسماء والأرقام والعمليات تجريبية"
         : "نسخة أولية للعرض • بيانات وصور مولدة للتجربة وليست مخزونًا أو حجوزات حقيقية"}
+      <Link
+        href="/workspace"
+        className="mx-3 inline-block font-medium underline underline-offset-4"
+      >
+        فتح بيانات مساحة العمل، بدخول الفريق
+      </Link>
     </div>
   );
 }

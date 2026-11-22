@@ -725,3 +725,45 @@ export async function confirmDressReady(
       "سُجل الفستان جاهزًا داخل الأتيليه. لم يتغير أي حجز أو موعد تلقائيًا.",
   };
 }
+
+export async function reorderDressImages(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "غير مسموح" };
+  const parsed = z
+    .object({
+      id: z.uuid(),
+      version: z.coerce.number().int().positive(),
+      images: z.array(z.uuid()).max(1000),
+    })
+    .safeParse({
+      id: form.get("id"),
+      version: form.get("version"),
+      images: form.getAll("image_ids"),
+    });
+  if (!parsed.success)
+    return {
+      error:
+        "قائمة صور غير صحيحة؛ الحد التقني ١٠٠٠ صورة. حدّث الصفحة ثم أعد المحاولة.",
+    };
+  const { error } = await db.rpc("reorder_dress_images", {
+    p_dress_id: parsed.data.id,
+    p_expected_version: parsed.data.version,
+    p_image_ids: parsed.data.images,
+  });
+  if (error)
+    return {
+      error:
+        error.message.includes("stale_dress_version") ||
+        error.message.includes("image_set_changed_refresh")
+          ? "تغيرت الصور أو نسخة البيانات. حدّث الصفحة وراجع الترتيب قبل الحفظ."
+          : "تعذر تأكيد الترتيب. حدّث الصفحة للتحقق؛ لم نُجر أي إعادة ترتيب بديلة.",
+    };
+  revalidatePath("/");
+  revalidatePath("/workspace");
+  revalidatePath(`/workspace/dresses/${parsed.data.id}`);
+  revalidatePath(`/dresses/${parsed.data.id}`);
+  return { success: "تم حفظ ترتيب الصور؛ الأولى هي الرئيسية في الكتالوج." };
+}

@@ -18,7 +18,7 @@ export default function InventoryPreview() {
         <h1 className="mb-3 text-2xl">إدارة الفستان</h1>
         <p className="mb-8 text-xs leading-7 text-muted-foreground">
           معاينة للتصميم ببيانات تجريبية. الحفظ والرفع والأرشفة معطلة هنا، وتتاح
-          للأدمن بعد ربط Supabase.
+          داخل حساب الأدمن المصرح، لا من شاشة المعاينة.
         </p>
         <InventoryEditor
           preview
@@ -38,7 +38,19 @@ export default function InventoryPreview() {
             { id: "engagement", name: "خطوبة" },
             { id: "wedding", name: "أفراح" },
           ]}
-          images={[{ id: "sample", url: d.image, sort_order: 0 }]}
+          images={[
+            { id: "sample", url: d.image, sort_order: 0 },
+            {
+              id: "sample-2",
+              url: "/dresses/sage-detail-top.webp",
+              sort_order: 1,
+            },
+            {
+              id: "sample-3",
+              url: "/dresses/sage-detail-hem.webp",
+              sort_order: 2,
+            },
+          ]}
         />
       </main>
     </>

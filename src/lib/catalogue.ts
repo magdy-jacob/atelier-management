@@ -10,7 +10,7 @@ export async function getCatalogue(): Promise<{
   const { data, error } = await db
     .from("dresses")
     .select(
-      "id,code,name,color,size,public_availability,categories(name),dress_images(path,sort_order)",
+      "id,code,name,color,size,public_availability,categories(name),dress_images(id,path,sort_order)",
     )
     .eq("archived", false)
     .order("created_at", { ascending: false });
@@ -33,7 +33,7 @@ export async function getCatalogue(): Promise<{
         "بدون تصنيف",
       availability: d.public_availability,
       images: [...d.dress_images]
-        .sort((a, b) => a.sort_order - b.sort_order)
+        .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
         .map(
           (image) =>
             db.storage.from("dress-images").getPublicUrl(image.path).data
@@ -43,8 +43,10 @@ export async function getCatalogue(): Promise<{
         ? db.storage
             .from("dress-images")
             .getPublicUrl(
-              [...d.dress_images].sort((a, b) => a.sort_order - b.sort_order)[0]
-                .path,
+              [...d.dress_images].sort(
+                (a, b) =>
+                  a.sort_order - b.sort_order || a.id.localeCompare(b.id),
+              )[0].path,
             ).data.publicUrl
         : "/placeholder.svg",
     })),

@@ -147,6 +147,27 @@ test("inventory editor preview is clear, responsive and cannot mutate", async ({
   await expect(
     page.getByRole("button", { name: "الرفع غير مفعل في المعاينة" }),
   ).toBeDisabled();
+  await expect(
+    page.getByRole("link", {
+      name: "فتح بيانات مساحة العمل، بدخول الفريق",
+      exact: true,
+    }),
+  ).toHaveAttribute("href", "/workspace");
+  await expect(page.locator("[data-image-id]")).toHaveCount(3);
+  await expect(
+    page.getByRole("button", {
+      name: "حفظ الترتيب معطل في المعاينة",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "تأخير الصورة 1", exact: true })
+    .click();
+  await expect(page.locator("[data-image-id]").first()).toHaveAttribute(
+    "data-image-id",
+    "sample-2",
+  );
+  await expect(page.getByText(/ترتيب جديد غير محفوظ/)).toBeVisible();
   await page.screenshot({
     path: "evidence/inventory-desktop.png",
     fullPage: true,

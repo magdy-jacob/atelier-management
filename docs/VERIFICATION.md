@@ -7,7 +7,7 @@ Checked on 22 November 2026. This record applies to the source archive's local v
 - `npm run lint`: no ESLint errors or warnings.
 - `npm run typecheck`: TypeScript passes.
 - `npm test`: 28 domain/image/timezone/operations/aggregate/prototype/workflow/report tests pass.
-- `npm run test:db`: 95 checks pass against a temporary real local PostgreSQL instance. Auth and Storage schemas are local substitutes, not live Supabase services.
+- `npm run test:db`: 106 checks pass against a temporary real local PostgreSQL instance. Auth and Storage schemas are local substitutes, not live Supabase services.
 - `npm run build`: optimized Next.js build passes.
 - `npm run test:e2e`: 15 browser scenarios pass in Chrome, covering desktop/mobile, filters, dress details, no public price, demo role presentation, overlap rejection, first available date, accepted local simulation, calendar, disabled login before configuration and a closed unconfigured workspace.
 - Dependency audit: no known vulnerabilities reported at verification time, after overriding the CLI's vulnerable transitive minimatch version. The lockfile records the tested graph. An audit is not a guarantee of application security.
@@ -133,3 +133,9 @@ Browser workflow scenarios use explicitly synthetic disabled previews. Hosted au
 Current suite: 28 unit tests, 95 database checks, 15 browser scenarios. Report checks compare receipt count/sum with the current administrative summary, verify Cairo midnight splits, deny employee/unassigned/inactive/anon, reject invalid ranges, return empty rather than invented data, and create 5001 disposable local receipts within a rolled-back owner-only fixture to prove complete refusal rather than truncation. No real customer or money operation occurs.
 
 CSV tests cover formula cells including whitespace/BOM variants, commas/quotes/newlines, UTF-8 BOM/CRLF, exact amounts beyond JavaScript safe integer arithmetic, literal leading-zero phone/code values, and schema/count/sum mismatch refusal. Browser scenario downloads and inspects the synthetic CSV, checks report explanation and desktop/mobile layout, and checks protected report/export routes redirect to login without configuration. Hosted authenticated report/download acceptance remains separate. Migration 11 is read-only apart from creating its index/function; it does not alter receipt rows or enable operation.
+
+## Image ordering 0.14.0
+
+28 unit tests, 106 PostgreSQL checks and 15 browser scenarios pass, plus lint/typecheck/production build and npm audit. New database coverage denies employee/other/inactive/anon and direct metadata updates, rejects duplicate/missing/foreign/null lists and stale changed orders, verifies saved canonical order/main image and one parent version increment, and proves exact retry adds neither audit rows nor version increments. Two competing different reorders from the same version produce exactly one winner; concurrent metadata inserts append at distinct positions and each update the version once. Existing repeat-safe demo seed test still passes.
+
+Browser inventory scenario reorders three same-garment synthetic thumbnails locally, verifies the unsaved indicator/main image and disabled preview save, checks the persisted-data navigation target, and checks desktop/mobile overflow. Actual pixels of desktop/mobile inventory and fixed-sidebar dashboard were inspected after the navigation copy change. These are previews; authenticated hosted save/feedback and catalogue-order acceptance remain separate. Migration 12 changes no existing metadata/order/fixture values and does not enable the financial or booking gate.

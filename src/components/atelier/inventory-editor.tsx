@@ -1,6 +1,6 @@
 "use client";
-import Image from "next/image";
-import { useActionState } from "react";
+import { ImageOrdering } from "./image-ordering";
+import { useActionState, useState } from "react";
 import { Archive, ImagePlus, Save, RotateCcw } from "lucide-react";
 import {
   editDress,
@@ -58,6 +58,7 @@ export function InventoryEditor({
   preview?: boolean;
   readOnly?: boolean;
 }) {
+  const [orderSuccess, setOrderSuccess] = useState("");
   const [editState, editAction, editing] = useActionState(editDress, initial);
   const [archiveState, archiveAction, archiving] = useActionState(
     archiveDress,
@@ -224,27 +225,20 @@ export function InventoryEditor({
             {images.length} صور
           </span>
         </div>
+        <Message state={{ success: orderSuccess }} />
         {images.length ? (
-          <div className="mb-7 grid grid-cols-2 gap-3">
-            {images.map((image, i) => (
-              <div
-                key={image.id}
-                className="relative aspect-[4/5] overflow-hidden rounded-xl bg-muted"
-              >
-                <Image
-                  src={image.url}
-                  alt={`${dress.name}، صورة ${i + 1}`}
-                  fill
-                  sizes="(max-width:768px) 50vw, 23vw"
-                  className="object-cover"
-                />
-                {i === 0 && (
-                  <span className="absolute right-2 bottom-2 rounded-full bg-white/90 px-3 py-1 text-[9px]">
-                    الصورة الرئيسية
-                  </span>
-                )}
-              </div>
-            ))}
+          <div className="mb-7">
+            <ImageOrdering
+              key={`${dress.version}-${images.map((i) => i.id).join("-")}`}
+              dressId={dress.id}
+              version={dress.version}
+              name={dress.name}
+              images={images}
+              preview={preview}
+              readOnly={readOnly}
+              onSuccess={setOrderSuccess}
+              onChanged={() => setOrderSuccess("")}
+            />
           </div>
         ) : (
           <div className="mb-7 flex min-h-56 flex-col items-center justify-center gap-4 rounded-xl border border-dashed bg-muted/40 text-muted-foreground">
@@ -289,8 +283,8 @@ export function InventoryEditor({
                   : "رفع الصورة"}
             </Button>
             <p className="text-[10px] leading-6 text-muted-foreground">
-              تظهر الصور بترتيب إضافتها. حذف الصور وإعادة ترتيبها لم يُوصلا
-              بالواجهة بعد.
+              الصور الجديدة تُضاف في نهاية القائمة. يمكن حفظ ترتيبها وتغيير
+              الرئيسية أعلاه. حذف الصور لم يُوصل بعد.
             </p>
           </form>
         )}

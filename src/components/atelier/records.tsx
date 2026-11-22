@@ -153,7 +153,9 @@ export function BookingLedger({
   price,
   fees,
   payments,
+  cancelled = false,
 }: {
+  cancelled?: boolean;
   price: number;
   fees: number | string;
   payments: LedgerRow[];
@@ -165,13 +167,19 @@ export function BookingLedger({
   const priceValue = BigInt(String(price)),
     feesValue = BigInt(String(fees));
   const totals: [string, bigint][] = [
-    ["قيمة الحجز", priceValue],
+    [cancelled ? "قيمة الحجز قبل الإلغاء" : "قيمة الحجز", priceValue],
     ["غرامات مسجلة", feesValue],
     ["دفعات مسجلة", paid],
-    ["المتبقي", priceValue + feesValue - paid],
+    ["المتبقي", cancelled ? BigInt(0) : priceValue + feesValue - paid],
   ];
   return (
     <div className="space-y-6">
+      {cancelled && (
+        <p className="rounded-xl border bg-secondary p-4 text-xs leading-8">
+          الحجز ملغى؛ لا يُطالب بباقي قيمته. المقدم المسجل غير مسترد، والدفعات
+          التاريخية محفوظة دون رد تلقائي.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {totals.map(([label, amount]) => (
           <div key={label} className="studio-card p-5">

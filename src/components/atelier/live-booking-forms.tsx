@@ -60,6 +60,7 @@ export function LiveBookingForm({
     <form
       action={preview ? undefined : action}
       onSubmit={preview ? (e) => e.preventDefault() : undefined}
+      onReset={(event) => event.preventDefault()}
       className="studio-card space-y-6 p-6 md:p-8"
     >
       <input name="request_id" type="hidden" value={requestId} />
@@ -216,22 +217,41 @@ export function LivePaymentForm({
   enabled,
   requestId,
   preview = false,
+  context = "return_balance",
+  defaultAmount,
 }: {
   bookingId: string;
   methods: string[];
   enabled: boolean;
   requestId: string;
   preview?: boolean;
+  context?: "deposit" | "return_balance" | null;
+  defaultAmount?: string;
 }) {
   const [state, action, pending] = useActionState(
     recordRealPayment,
     {} as ActionState,
   );
+  if (!context)
+    return (
+      <section className="studio-card space-y-4 p-6">
+        <Feedback state={state} />
+        <p className="text-xs leading-8 text-muted-foreground">
+          لا توجد دفعة إضافية متاحة الآن. قبل عودة العميلة يُسجل المقدم الأول
+          فقط؛ الباقي عند عودتها بالفستان. الحجز المغلق لا يقبل دفعات جديدة.
+        </p>
+      </section>
+    );
   return (
     <section className="studio-card p-6">
-      <h2 className="mb-3 text-base">تسجيل دفعة مستلمة</h2>
+      <h2 className="mb-3 text-base">
+        {context === "deposit" ? "تسجيل المقدم الأول" : "تسجيل رصيد العودة"}
+      </h2>
       <p className="mb-5 text-xs leading-7 text-muted-foreground">
-        لا يخصم هذا النموذج أموالًا من أي حساب. سجّل فقط ما استلمته بالفعل.
+        {context === "deposit"
+          ? "للحجز الذي لم يُسجل له أي مقدم بعد، وقبل التسليم فقط. لا يمكن زيادة مقدم مسجل من هذا النموذج."
+          : "يستخدم فقط عند عودة العميلة بالفستان فعلًا، لا لدفع الرصيد مقدمًا. يبقى إتمام العودة مشروطًا بسداد المتبقي كله."}{" "}
+        لا تحصيل إلكتروني.
       </p>
       {!enabled && (
         <p className="mb-5 rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
@@ -244,6 +264,7 @@ export function LivePaymentForm({
         onSubmit={preview ? (e) => e.preventDefault() : undefined}
         className="space-y-5"
       >
+        <input name="context" type="hidden" value={context} />
         <input name="booking_id" type="hidden" value={bookingId} />
         <input
           name="request_id"
@@ -254,6 +275,7 @@ export function LivePaymentForm({
           <label className="field">
             المبلغ (جنيه)
             <input
+              defaultValue={defaultAmount}
               name="amount"
               type="number"
               min="0.01"
@@ -286,6 +308,18 @@ export function LivePaymentForm({
           />
           أؤكد استلام هذا المبلغ فعليًا ومراجعة رصيد الحجز.
         </label>
+        {context === "return_balance" && (
+          <label className="flex items-start gap-3 text-xs leading-7">
+            <input
+              name="returning_confirm"
+              type="checkbox"
+              required
+              className="mt-2 size-4 accent-primary"
+            />
+            العميلة عادت بالفستان اليوم، وهذا المبلغ من الرصيد المستلم عند
+            الرجوع، وليس قبل عودتها.
+          </label>
+        )}
         <Feedback state={state} />
         <Button
           type="submit"

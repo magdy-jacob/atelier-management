@@ -15,6 +15,8 @@ const schema = z.object({
   payment_methods: z.array(z.string()),
   payment_method_optional: z.boolean().default(false),
   handover_return_ready: z.boolean().default(false),
+  receipt_timing_ready: z.boolean().default(false),
+  cancellation_ready: z.boolean().default(false),
 });
 export type BookingConfig = z.infer<typeof schema>;
 export async function getBookingConfig(

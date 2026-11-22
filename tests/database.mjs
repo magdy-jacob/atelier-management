@@ -60,7 +60,7 @@ try {
  create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;`);
   const migrationsDir = new URL("../supabase/migrations/", import.meta.url);
   for (const file of (await fs.readdir(migrationsDir))
-    .filter((f) => f.endsWith(".sql"))
+    .filter((f) => f.endsWith(".sql") && !f.startsWith("202611220016"))
     .sort()) {
     await client.query(await fs.readFile(new URL(file, migrationsDir), "utf8"));
   }
@@ -2388,6 +2388,324 @@ try {
       }
     },
   );
+  // Upgrade-path checkpoint: legacy receipt-engine tests above run on migration16.
+  // Apply migration16 here, then test its final timing/ACL/cancellation rules below.
+  await client.query(
+    await fs.readFile(
+      new URL("202611220016_cancellation_receipts.sql", migrationsDir),
+      "utf8",
+    ),
+  );
+  await check(
+    "receipt timing upgrade permits one initial deposit and balance only at confirmed physical return",
+    async () => {
+      await deny(
+        employee,
+        "select public.record_payment(gen_random_uuid(),$1,1,null)",
+        [booking],
+        /permission denied/,
+      );
+      await client.query(
+        "update public.settings set synthetic_test_enabled=true,live_bookings_enabled=true where id=true",
+      );
+      const scenario =
+        "select public.create_portfolio_scenario(gen_random_uuid(),'handover',$1) id";
+      const b = (await asUser(admin, scenario, [employee])).rows[0].id;
+      const receipt =
+        "select public.record_booking_receipt($1,$2,$3,$4,$5,$6) id";
+      await deny(
+        employee,
+        receipt,
+        [
+          "18181818-1818-4818-8818-181818181818",
+          b,
+          1,
+          null,
+          "return_balance",
+          false,
+        ],
+        /customer_return_confirmation_required/,
+      );
+      await deny(
+        employee,
+        receipt,
+        [
+          "18181818-1818-4818-8818-181818181818",
+          b,
+          1,
+          null,
+          "return_balance",
+          true,
+        ],
+        /balance_at_return_only/,
+      );
+      await deny(
+        employee,
+        receipt,
+        ["18181818-1818-4818-8818-181818181818", b, 1, null, "deposit", false],
+        /deposit_already_recorded/,
+      );
+      const d = (
+        await client.query(
+          "insert into public.dresses(code,name,color,size,category_id) select 'ZERO-DEPOSIT','Zero deposit local fixture','pink','M',id from public.categories limit 1 returning id",
+        )
+      ).rows[0].id;
+      const zero = (
+        await asUser(
+          employee,
+          "select public.create_booking(gen_random_uuid(),$1,'اختبار مقدم لاحق','TEST-ZERO',(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+1,10000,0,null) id",
+          [d],
+        )
+      ).rows[0].id;
+      const req = "19191919-1919-4919-8919-191919191919";
+      const args = [req, zero, 2500, null, "deposit", false];
+      const payment = (await asUser(employee, receipt, args)).rows[0].id;
+      assert.equal((await asUser(employee, receipt, args)).rows[0].id, payment);
+      await deny(
+        employee,
+        receipt,
+        [req, zero, 2499, null, "deposit", false],
+        /request_id_payload_mismatch/,
+      );
+      await deny(
+        employee,
+        receipt,
+        [
+          "20202020-2020-4020-8020-202020202020",
+          zero,
+          1,
+          null,
+          "deposit",
+          false,
+        ],
+        /deposit_already_recorded/,
+      );
+      await deny(
+        other,
+        receipt,
+        [req, zero, 2500, null, "deposit", false],
+        /not_authorized/,
+      );
+      // Owner-only local fixture date setup, never an application backdate route.
+      await client.query(
+        "update public.bookings set starts_on=(now() at time zone 'Africa/Cairo')::date,returns_on=(now() at time zone 'Africa/Cairo')::date where id=$1",
+        [zero],
+      );
+      await asUser(
+        employee,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [zero],
+      );
+      const balanceArgs = [
+        "21212121-2121-4121-8121-212121212121",
+        zero,
+        7500,
+        " ",
+        "return_balance",
+        true,
+      ];
+      const balance = (await asUser(employee, receipt, balanceArgs)).rows[0].id;
+      assert.equal(
+        (await asUser(employee, receipt, balanceArgs)).rows[0].id,
+        balance,
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select customer_returned_on::text d from public.receipt_confirmations where payment_id=$1",
+            [balance],
+          )
+        ).rows[0].d,
+        (
+          await asUser(employee, "select public.get_booking_workflow($1) w", [
+            zero,
+          ])
+        ).rows[0].w.today,
+      );
+      await asUser(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [zero],
+      );
+      const race = (await asUser(admin, scenario, [employee])).rows[0].id;
+      await asUser(
+        employee,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [race],
+      );
+      const results = await parallelAsUser(
+        "select public.record_booking_receipt(gen_random_uuid(),$1,7500,null,'return_balance',true)",
+        [[race], [race]],
+      );
+      assert.equal(results.filter((x) => x.ok).length, 1);
+      assert.equal(
+        (
+          await client.query(
+            "select sum(amount_piasters)::int n from public.payments where booking_id=$1",
+            [race],
+          )
+        ).rows[0].n,
+        10000,
+      );
+      await deny(
+        employee,
+        "delete from public.receipt_confirmations where booking_id=$1",
+        [zero],
+        /permission denied/,
+      );
+      await client.query(
+        "update public.settings set synthetic_test_enabled=false,live_bookings_enabled=false where id=true",
+      );
+    },
+  );
+  await check(
+    "admin cancellation is before handover, retains deposits, releases dates and never invents a refund",
+    async () => {
+      await client.query(
+        "update public.settings set synthetic_test_enabled=true,live_bookings_enabled=true where id=true",
+      );
+      const scenario =
+        "select public.create_portfolio_scenario(gen_random_uuid(),'handover',$1) id";
+      const b = (await asUser(admin, scenario, [employee])).rows[0].id;
+      const cancel = "select public.cancel_booking($1,$2,$3,$4) id";
+      const req = "23232323-2323-4323-8323-232323232323";
+      await deny(
+        employee,
+        cancel,
+        [req, b, "اختبار إلغاء", true],
+        /not_authorized/,
+      );
+      await deny(
+        inactive,
+        cancel,
+        [req, b, "اختبار إلغاء", true],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        cancel,
+        [req, b, "اختبار إلغاء", false],
+        /cancellation_confirmation_required/,
+      );
+      const before = (
+        await client.query(
+          "select jsonb_agg(to_jsonb(p) order by id)::text d from public.payments p where booking_id=$1",
+          [b],
+        )
+      ).rows[0].d;
+      const id = (await asUser(admin, cancel, [req, b, "اختبار إلغاء", true]))
+        .rows[0].id;
+      assert.equal(
+        (await asUser(admin, cancel, [req, b, "اختبار إلغاء", true])).rows[0]
+          .id,
+        id,
+      );
+      await deny(
+        admin,
+        cancel,
+        [req, b, "سبب آخر", true],
+        /request_id_payload_mismatch/,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select jsonb_agg(to_jsonb(p) order by id)::text d from public.payments p where booking_id=$1",
+            [b],
+          )
+        ).rows[0].d,
+        before,
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select retained_deposit_piasters::text n from public.booking_cancellations where id=$1",
+            [id],
+          )
+        ).rows[0].n,
+        "2500",
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select status from public.bookings where id=$1",
+            [b],
+          )
+        ).rows[0].status,
+        "cancelled",
+      );
+      const dressId = (
+        await client.query("select dress_id from public.bookings where id=$1", [
+          b,
+        ])
+      ).rows[0].dress_id;
+      await asUser(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'اختبار بعد إلغاء','TEST-CANCEL',(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+1,10000,0,null)",
+        [dressId],
+      );
+      const out = (await asUser(admin, scenario, [employee])).rows[0].id;
+      await asUser(
+        employee,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [out],
+      );
+      await deny(
+        admin,
+        cancel,
+        ["24242424-2424-4424-8424-242424242424", out, "اختبار", true],
+        /cancellation_before_handover_only/,
+      );
+      const historic = (await asUser(admin, scenario, [employee])).rows[0].id;
+      await client.query(
+        "insert into public.payments(request_id,booking_id,amount_piasters,method,kind,recorded_by) values(gen_random_uuid(),$1,1,null,'payment',$2)",
+        [historic, admin],
+      );
+      await deny(
+        admin,
+        cancel,
+        [
+          "25252525-2525-4525-8525-252525252525",
+          historic,
+          "اختبار استثناء",
+          true,
+        ],
+        /financial_exception_requires_admin_review/,
+      );
+      const race = (await asUser(admin, scenario, [employee])).rows[0].id;
+      const results = await parallelAsUser(
+        "select case when $2='cancel' then public.cancel_booking(gen_random_uuid(),$1,'اختبار تزامن',true) else public.record_handover(gen_random_uuid(),$1,true,true) end",
+        [
+          [race, "cancel"],
+          [race, "handover"],
+        ],
+        admin,
+      );
+      assert.equal(results.filter((x) => x.ok).length, 1);
+      await deny(
+        admin,
+        "delete from public.booking_cancellations where id=$1",
+        [id],
+        /permission denied/,
+      );
+      await deny(
+        employee,
+        "insert into public.booking_cancellations select * from public.booking_cancellations limit 1",
+        [],
+        /permission denied/,
+      );
+      assert.equal(
+        (await asUser(other, "select * from public.booking_cancellations"))
+          .rowCount,
+        0,
+      );
+      await client.query(
+        "update public.settings set synthetic_test_enabled=false,live_bookings_enabled=false where id=true",
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,
@@ -2397,6 +2715,94 @@ try {
       0,
     );
   });
+  await check(
+    "fresh database applies all16 migrations and enforces the corrected final receipt/cancellation boundary",
+    async () => {
+      await client.query("create database atelier_fresh");
+      const previous = client;
+      const fresh = new previous.constructor({
+        host: "127.0.0.1",
+        port: 55439,
+        user: "postgres",
+        password: "local-test-only",
+        database: "atelier_fresh",
+      });
+      await fresh.connect();
+      try {
+        await fresh.query(
+          `create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema public,auth to anon,authenticated;create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;`,
+        );
+        for (const file of (await fs.readdir(migrationsDir))
+          .filter((f) => f.endsWith(".sql"))
+          .sort())
+          await fresh.query(
+            await fs.readFile(new URL(file, migrationsDir), "utf8"),
+          );
+        await fresh.query("insert into auth.users values($1)", [admin]);
+        await fresh.query(
+          "insert into public.profiles(id,full_name,role) values($1,'Fresh admin','admin')",
+          [admin],
+        );
+        await fresh.query(
+          "insert into public.categories(name) values('Fresh synthetic');update public.settings set synthetic_test_enabled=true,live_bookings_enabled=true,date_precision='day',business_timezone='Africa/Cairo',same_day_allowed=false where id=true",
+        );
+        client = fresh;
+        await deny(
+          admin,
+          "update public.settings set synthetic_test_enabled=false where id=true",
+          [],
+          /permission denied/,
+        );
+        const cfg = (
+          await asUser(admin, "select public.get_staff_booking_config() c")
+        ).rows[0].c;
+        assert.equal(cfg.receipt_timing_ready, true);
+        assert.equal(cfg.cancellation_ready, true);
+        const b = (
+          await asUser(
+            admin,
+            "select public.create_portfolio_scenario(gen_random_uuid(),'handover',null) id",
+          )
+        ).rows[0].id;
+        await deny(
+          admin,
+          "select public.record_payment(gen_random_uuid(),$1,7500,null)",
+          [b],
+          /permission denied/,
+        );
+        await asUser(
+          admin,
+          "select public.record_handover(gen_random_uuid(),$1,true,true)",
+          [b],
+        );
+        await asUser(
+          admin,
+          "select public.record_booking_receipt(gen_random_uuid(),$1,7500,null,'return_balance',true)",
+          [b],
+        );
+        await asUser(
+          admin,
+          "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+          [b],
+        );
+        const c = (
+          await asUser(
+            admin,
+            "select public.create_portfolio_scenario(gen_random_uuid(),'handover',null) id",
+          )
+        ).rows[0].id;
+        await asUser(
+          admin,
+          "select public.cancel_booking(gen_random_uuid(),$1,'Fresh synthetic cancellation',true)",
+          [c],
+        );
+      } finally {
+        client = previous;
+        await fresh.end();
+        await previous.query("drop database atelier_fresh");
+      }
+    },
+  );
   console.log(`Database checks passed: ${checks}`);
 } finally {
   if (client) await client.end();

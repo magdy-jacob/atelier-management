@@ -1,3 +1,4 @@
+import { CancellationPanel } from "@/components/atelier/cancellation-panel";
 import { BookingWorkflow } from "@/components/atelier/booking-workflow";
 import { workflowSchema } from "@/lib/workflow";
 import { money } from "@/lib/domain";
@@ -63,12 +64,42 @@ export default async function BookingDetails({
   );
   const remaining =
     BigInt(String(b.agreed_price_piasters)) + feeTotal - paidTotal;
+  const cancellationResult = config?.cancellation_ready
+    ? await db
+        .from("booking_cancellations")
+        .select("reason,retained_deposit_piasters,created_at")
+        .eq("booking_id", id)
+        .maybeSingle()
+    : null;
+  const cancellation = cancellationResult?.data
+    ? {
+        ...cancellationResult.data,
+        retained_deposit_piasters: String(
+          cancellationResult.data.retained_deposit_piasters,
+        ),
+      }
+    : null;
+  const depositTotal = (payments ?? [])
+    .filter((p) => p.kind === "deposit")
+    .reduce((sum, p) => sum + BigInt(String(p.amount_piasters)), BigInt(0));
+  const receiptContext =
+    b.status === "confirmed" && paidTotal === BigInt(0)
+      ? "deposit"
+      : b.status === "out" && remaining > BigInt(0)
+        ? "return_balance"
+        : null;
+  const capped =
+    remaining > BigInt(9999999999) ? BigInt(9999999999) : remaining;
+  const amountDefault =
+    capped > BigInt(0)
+      ? `${capped / BigInt(100)}.${String(capped % BigInt(100)).padStart(2, "0")}`
+      : undefined;
   const dress = Array.isArray(b.dresses) ? b.dresses[0] : b.dresses;
   const customer = Array.isArray(b.customers) ? b.customers[0] : b.customers;
   return (
     <StaffFrame
       title={`حجز ${dress?.name ?? ""}`}
-      description="تفاصيل الحجز وسجل مبالغه المستلمة والمستحقة ضمن صلاحيات الحساب. لا تحصيل إلكتروني. التسليم والعودة والفحص بحسب الصلاحيات. الإلغاء والاسترداد لم يُفعّلا بعد."
+      description="تفاصيل الحجز وسجل مبالغه المستلمة والمستحقة ضمن صلاحيات الحساب. لا تحصيل إلكتروني. التسليم والعودة والفحص بحسب الصلاحيات. الإلغاء للأدمن قبل التسليم فقط، والمقدم غير مسترد. لا ردّ مبالغ تلقائي."
       name={profile.full_name}
       role={profile.role}
       active="/workspace"
@@ -115,6 +146,7 @@ export default async function BookingDetails({
       ) : (
         <>
           <BookingLedger
+            cancelled={b.status === "cancelled"}
             price={Number(b.agreed_price_piasters)}
             fees={feeTotal.toString()}
             payments={payments ?? []}
@@ -136,11 +168,14 @@ export default async function BookingDetails({
           bookingId={b.id}
           requestId={crypto.randomUUID()}
           methods={config?.payment_methods ?? []}
+          context={receiptContext}
+          defaultAmount={
+            receiptContext === "return_balance" ? amountDefault : undefined
+          }
           enabled={
-            !!(
-              bookingConfigReady(config) &&
-              ["confirmed", "out"].includes(b.status)
-            )
+            bookingConfigReady(config) &&
+            config?.receipt_timing_ready === true &&
+            !!receiptContext
           }
         />
       )}
@@ -162,6 +197,20 @@ export default async function BookingDetails({
         ) : (
           <Unavailable />
         ))}
+      {cancellationResult?.error ? (
+        <Unavailable />
+      ) : (
+        <CancellationPanel
+          bookingId={b.id}
+          status={b.status}
+          admin={profile.role === "admin"}
+          enabled={
+            bookingConfigReady(config) && config?.cancellation_ready === true
+          }
+          deposit={depositTotal.toString()}
+          cancellation={cancellation}
+        />
+      )}
       <p className="rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
         العمليات والتقويم يستخدمان أيام مصر. الحالة المسجلة هنا لا تتغير تلقائيًا
         مع مرور الموعد؛ يلزم إجراء تسليم أو عودة معتمد.

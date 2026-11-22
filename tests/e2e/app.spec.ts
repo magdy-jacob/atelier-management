@@ -787,3 +787,90 @@ test("portfolio forms clearly distinguish preserved synthetic workflows from non
   ).toBeTruthy();
   expect(errors).toEqual([]);
 });
+
+test("cancellation and return-receipt previews show timing, role limits and retained deposit without an invented refund", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/cancellation");
+  await page.getByLabel("سبب الإلغاء").fill("اختبار تغيير الخطة قبل التسليم");
+  await page.getByRole("checkbox").check();
+  await expect(
+    page.getByRole("button", { name: "تأكيد إلغاء الحجز والاحتفاظ بالمقدم" }),
+  ).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/cancellation-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/cancellation-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/demo/cancellation?view=out");
+  await expect(
+    page.getByRole("button", { name: "تأكيد إلغاء الحجز والاحتفاظ بالمقدم" }),
+  ).toHaveCount(0);
+  await expect(page.locator('input[name="amount"]')).toHaveValue("75.00");
+  await expect(
+    page.getByRole("checkbox", { name: /العميلة عادت بالفستان اليوم/ }),
+  ).toHaveAttribute("required", "");
+  await page.screenshot({
+    path: "evidence/return-receipt-mobile.png",
+    fullPage: true,
+  });
+  await page.goto("/demo/cancellation?view=employee");
+  await expect(page.getByLabel("سبب الإلغاء")).toHaveCount(0);
+  await page.goto("/demo/cancellation?view=cancelled");
+  await expect(
+    page.getByText("قيمة الحجز قبل الإلغاء", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/لا يُطالب بباقي قيمته/)).toBeVisible();
+  await expect(
+    page.getByText("المتبقي", { exact: true }).locator(".."),
+  ).toContainText("٠٫٠٠");
+  await page.screenshot({
+    path: "evidence/cancelled-ledger-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+});
+
+test("booking form retains staff input when the browser requests a post-action reset", async ({
+  page,
+}) => {
+  await page.goto("/demo/portfolio?view=booking");
+  await page
+    .locator('[name="dress_id"]')
+    .selectOption("d0000000-0000-4000-8000-000000000001");
+  const fields = {
+    customer: "اختبار اسم محفوظ",
+    phone: "TEST-KEEP",
+    starts_on: "2026-12-08",
+    returns_on: "2026-12-09",
+    method: "طريقة مصطنعة",
+  };
+  for (const [key, value] of Object.entries(fields))
+    await page.locator(`[name="${key}"]`).fill(value);
+  await page.locator('[name="deposit_confirm"]').check();
+  await page
+    .locator('[name="phone"]')
+    .evaluate((el: HTMLInputElement) => el.form!.reset());
+  for (const [key, value] of Object.entries(fields))
+    await expect(page.locator(`[name="${key}"]`)).toHaveValue(value);
+  await expect(page.locator('[name="dress_id"]')).toHaveValue(
+    "d0000000-0000-4000-8000-000000000001",
+  );
+  await expect(page.locator('[name="deposit_confirm"]')).toBeChecked();
+});

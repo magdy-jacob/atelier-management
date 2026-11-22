@@ -385,7 +385,8 @@ export async function recordRealPayment(
   form: FormData,
 ): Promise<ActionState> {
   const { db } = await requireStaff();
-  if (!(await bookingMutationsAllowed(db)))
+  const config = await getBookingConfig(db);
+  if (!bookingConfigReady(config) || !config?.receipt_timing_ready)
     return {
       error:
         "إعداد الحفظ الوظيفي غير مكتمل أو تعذر التحقق منه. لم تُسجل العملية.",
@@ -396,6 +397,7 @@ export async function recordRealPayment(
       booking_id: z.uuid(),
       method: z.string().trim().max(40).default(""),
       confirm: z.literal("on"),
+      context: z.enum(["deposit", "return_balance"]),
     })
     .safeParse(Object.fromEntries(form));
   if (!parsed.success)
@@ -411,13 +413,32 @@ export async function recordRealPayment(
   }
   if (amount <= 0) return { error: "المبلغ يجب أن يكون أكبر من صفر." };
   const d = parsed.data;
-  const { error } = await db.rpc("record_payment", {
+  if (d.context === "return_balance" && form.get("returning_confirm") !== "on")
+    return { error: "أكد عودة العميلة بالفستان اليوم قبل تسجيل رصيد العودة." };
+  const { error } = await db.rpc("record_booking_receipt", {
     p_request_id: d.request_id,
     p_booking_id: d.booking_id,
     p_amount: amount,
     p_method: d.method || null,
+    p_context: d.context,
+    p_returning: d.context === "return_balance",
   });
   if (error) {
+    if (error.message.includes("deposit_already_recorded"))
+      return {
+        error:
+          "المقدم مسجل بالفعل. لا يُضاف إليه مبلغ قبل عودة العميلة؛ راجع سجل الحجز.",
+      };
+    if (
+      error.message.includes("balance_at_return_only") ||
+      error.message.includes("customer_return_confirmation_required")
+    )
+      return {
+        error:
+          "الرصيد يُسجل عند عودة العميلة بالفستان، بعد تسليم مسجل، وليس قبل ذلك.",
+      };
+    if (error.message.includes("deposit_before_handover_only"))
+      return { error: "تسجيل المقدم الأول متاح للحجز المؤكد قبل التسليم فقط." };
     if (
       error.message.includes("overpayment") ||
       error.message.includes("invalid_amount")
@@ -439,8 +460,8 @@ export async function recordRealPayment(
         "لم نتمكن من تأكيد النتيجة. أعد نفس المحاولة بمعرف الطلب الحالي، ولا تضف دفعة أخرى قبل مراجعة السجل.",
     };
   }
-  revalidatePath(`/workspace/bookings/${d.booking_id}`);
-  revalidatePath("/workspace");
+  refreshWorkflow(d.booking_id);
+  revalidatePath("/workspace/reports");
   return {
     success: "تم تسجيل الدفعة المستلمة في السجل، دون تحصيل إلكتروني.",
     nextRequestId: crypto.randomUUID(),
@@ -998,5 +1019,57 @@ export async function createPortfolioScenario(
   return {
     success:
       "تم إنشاء سيناريو مصطنع محفوظ. افتح الحجز من القائمة أدناه لتجربته.",
+  };
+}
+
+export async function cancelBooking(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "الإلغاء للأدمن فقط." };
+  const config = await getBookingConfig(db);
+  if (!bookingConfigReady(config) || !config?.cancellation_ready)
+    return { error: "إعداد الإلغاء لم يكتمل أو تعذر التحقق منه." };
+  const parsed = z
+    .object({
+      request_id: z.uuid(),
+      booking_id: z.uuid(),
+      reason: z.string().trim().min(1).max(500),
+      confirm: z.literal("on"),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return { error: "اكتب سبب الإلغاء وأكد الاحتفاظ بالمقدم غير المسترد." };
+  const { error } = await db.rpc("cancel_booking", {
+    p_request_id: parsed.data.request_id,
+    p_booking_id: parsed.data.booking_id,
+    p_reason: parsed.data.reason,
+    p_confirm_nonrefundable: true,
+  });
+  if (error) {
+    if (error.message.includes("cancellation_before_handover_only"))
+      return {
+        error: "الإلغاء قبل التسليم فقط. بعد خروج الفستان استخدم مسار العودة.",
+      };
+    if (error.message.includes("financial_exception_requires_admin_review"))
+      return {
+        error:
+          "السجل يحتوي دفعات إضافية أو غرامة تاريخية تحتاج قرارًا استثنائيًا من الأدمن. لم نلغِ الحجز أو نغيّر أو نرد أي مبلغ تلقائيًا.",
+      };
+    if (error.message.includes("request_id_payload_mismatch"))
+      return {
+        error: "طلب الإلغاء محفوظ بقيم مختلفة. راجع سجل الحجز قبل طلب جديد.",
+      };
+    return {
+      error:
+        "تعذر تأكيد الإلغاء. راجع أحدث حالة للحجز وأعد نفس المحاولة دون تغيير القيم.",
+    };
+  }
+  refreshWorkflow(parsed.data.booking_id);
+  revalidatePath("/workspace/reports");
+  return {
+    success:
+      "سُجل الإلغاء قبل التسليم، مع الاحتفاظ بالمقدم وتحرير الموعد. الدفعات والسجل محفوظان؛ لا رد مال تلقائي.",
   };
 }

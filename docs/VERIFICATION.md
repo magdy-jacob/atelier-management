@@ -1,4 +1,4 @@
-# Verification record, 0.16.1
+# Verification record, 0.17.1
 
 Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
 
@@ -6,9 +6,9 @@ Checked locally on 22 November 2026. This source checkpoint is not a claim that 
 
 - ESLint and TypeScript: pass.
 - 34 unit tests: pass.
-- 142 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
+- 163 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
 - Optimized Next.js builds with functional portfolio flag off and on: pass.
-- 17 Chrome browser scenarios in the flag-on build: pass. The default build's existing 16 scenarios and new portfolio scenario were also checked.
+- 19 Chrome browser scenarios in the flag-on build: pass. The default build's existing 16 scenarios and new portfolio scenario were also checked.
 - npm audit with production dependencies: zero reported vulnerabilities at this checkpoint. An audit is not a security guarantee.
 
 ## Functional synthetic mode coverage
@@ -32,7 +32,7 @@ Evidence: `evidence/portfolio-scenarios-desktop.png`, `portfolio-scenarios-mobil
 
 Hosted authenticated creation/payment/handover/return/scenario feedback, actual employee sessions, vendor RLS/Storage and current deployment configuration are a separate acceptance step. No live setting or audience was changed by this local work. Do not present disabled preview clicks as hosted acceptance.
 
-Employee account management, booking editing/cancellation and receipt-timing adjustments, future-availability review, backup/restore and full integrated hosted acceptance remain open. No actual payout or refund exists. The previous review dataset and original image objects must stay intact. See `DECISIONS.md` for settled and open policy boundaries.
+Employee account management, booking editing and historical financial exceptions, future-availability review, backup/restore and full integrated hosted acceptance remain open. No actual payout or refund exists. The previous review dataset and original image objects must stay intact. See `DECISIONS.md` for settled and open policy boundaries.
 
 ## Historical local checkpoints
 
@@ -133,3 +133,15 @@ Hosted acceptance must use a newly uploaded disposable object only. SQL rollback
 ## Settings-boundary correction 0.16.1
 
 Independent review found that migration1 had retained app-admin settings INSERT/UPDATE grants and an all-command RLS policy. This could bypass the synthetic guard. Activation was held. Migration15 revokes all settings grants from public/anon/authenticated, grants authenticated SELECT only and replaces the admin all-command policy with SELECT-only RLS. Local configuration fixtures now use the actual test database owner. Regressions deny admin attempts to disable synthetic scope, alter the live gate/day policy, upsert or delete settings; deny employee writes; verify flags stay enabled; and independently challenge RLS with a temporary local UPDATE grant before restoring the final revoked state. The UI is unchanged, so the inspected v0.16 portfolio screenshots remain applicable. Do not activate the uncorrected v0.16.0 bundle.
+
+## Cancellation and receipt timing 0.17.1
+
+34 unit tests,163 database checks,19 Chrome scenarios, lint/typecheck and optimized functional build pass. The database suite explicitly tests the142-check migration15 baseline first, then upgrades it to16 and tests the changed receipt ACL/timing and cancellation behavior. A separate fresh database applies all16 migrations, tests final admin settings denial, the new handover/return-receipt/return flow and cancellation. This is upgrade-path plus fresh-install coverage, not a claim the old unrestricted receipt API still exists for application users.
+
+New checks deny the old general receipt RPC; require return-presence confirmation and an out booking for balance receipts; permit the first deposit on a zero-receipt booking and deny top-ups; preserve exact retries and scoped employee access; store the Cairo return-confirmation day; and ensure concurrent receipts cannot overpay. Cancellation checks cover admin-only/confirmation/actor denial, exact retry and changed reason, retained payment fingerprints and deposit snapshot, release of dates, outside/handed-over rejection, historical extra-payment refusal without refund, direct-record write denial and cancellation-versus-handover race with exactly one winner.
+
+Actual desktop/mobile pixels of cancellation and the physical-return receipt form were inspected. Preview scenarios exercise role limits, disabled preview submit, the required physical-return confirmation and a cancelled ledger that keeps the original agreed value and receipt but shows no remaining rent due. Hosted feedback, actual employee sessions and real vendor behavior remain a separate acceptance step. No hosted gate, dataset or object mutation was made in this source task.
+
+## Input retention correction 0.17.1
+
+The booking form cancels native form reset events. Successful booking navigates away; rejected actions no longer clear uncontrolled staff fields merely because the Server Action returned an error object. A browser test requests the same native reset and verifies selected dress, test identity/contact, dates, method and confirmation stay intact. Actual hosted rejected-action feedback remains independently verifiable; the local test does not pretend to be a hosted Supabase rejection.

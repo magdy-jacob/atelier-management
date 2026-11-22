@@ -67,16 +67,20 @@ export function LoginForm({ ready }: { ready: boolean }) {
     </form>
   );
 }
-export function CategoryForm() {
+export function CategoryForm({ preview = false }: { preview?: boolean } = {}) {
   const [state, action, pending] = useActionState(createCategory, initial);
   return (
-    <form action={action} className="space-y-4">
+    <form
+      action={preview ? undefined : action}
+      onSubmit={preview ? (e) => e.preventDefault() : undefined}
+      className="space-y-4"
+    >
       <label className="field">
         اسم التصنيف
         <input name="name" maxLength={80} required />
       </label>
       <Feedback state={state} />
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={pending || preview}>
         {pending ? "جارٍ الحفظ…" : "إضافة تصنيف"}
       </Button>
     </form>

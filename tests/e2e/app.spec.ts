@@ -413,3 +413,67 @@ test("overdue fee is optional, explicit and disabled in prototype preview", asyn
   ).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test("category editing preview preserves used dress history and is responsive", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/categories");
+  await expect(
+    page.getByRole("heading", { name: "إدارة التصنيفات", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("article")).toHaveCount(4);
+  const used = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "سهرة · تجريبي", exact: true }),
+  });
+  await used.getByText("حذف تصنيف غير مستخدم", { exact: true }).click();
+  await expect(used.getByRole("checkbox")).toBeDisabled();
+  await expect(
+    used.getByRole("button", { name: "حذف التصنيف غير المستخدم", exact: true }),
+  ).toBeDisabled();
+  const unused = page.getByRole("article").filter({
+    has: page.getByRole("heading", {
+      name: "تصنيف غير مستخدم · تجريبي",
+      exact: true,
+    }),
+  });
+  await unused.getByLabel("اسم التصنيف").fill("تصنيف جديد · معاينة");
+  await unused.getByText("حذف تصنيف غير مستخدم", { exact: true }).click();
+  await unused.getByRole("checkbox").check();
+  await expect(
+    unused.getByRole("button", { name: "حفظ اسم التصنيف", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    unused.getByRole("button", {
+      name: "حذف التصنيف غير المستخدم",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/categories-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/categories");
+  await page
+    .getByRole("article")
+    .first()
+    .getByText("حذف تصنيف غير مستخدم", { exact: true })
+    .click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/categories-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/workspace/categories");
+  await expect(page).toHaveURL(/login/);
+  expect(errors).toEqual([]);
+});

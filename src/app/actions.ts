@@ -82,6 +82,7 @@ export async function createCategory(
   const { error } = await db.from("categories").insert({ name: name.data });
   if (error) return { error: "تعذر الإضافة، قد يكون الاسم مكررًا." };
   revalidatePath("/workspace");
+  revalidatePath("/workspace/categories");
   return { success: "تمت إضافة التصنيف" };
 }
 
@@ -514,5 +515,54 @@ export async function addManualLateFee(
   return {
     success:
       "أضيفت الغرامة الاختيارية إلى المستحق فقط. لم تُسجّل كدفعة ولم يُحصّل مال إلكترونيًا.",
+  };
+}
+
+export async function manageCategory(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db, profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "إدارة التصنيفات للأدمن فقط." };
+  const parsed = z
+    .object({
+      id: z.uuid(),
+      version: z.coerce.number().int().positive(),
+      intent: z.enum(["rename", "delete"]),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return { error: "تعذر التحقق من التصنيف. حدّث الصفحة ثم أعد المحاولة." };
+  const deleting = parsed.data.intent === "delete";
+  if (deleting && form.get("confirm_delete") !== "on")
+    return { error: "أكد حذف التصنيف غير المستخدم أولًا." };
+  const name = z.string().trim().min(1).max(80).safeParse(form.get("name"));
+  if (!deleting && !name.success)
+    return { error: "اكتب اسم تصنيف من حرف إلى ٨٠ حرفًا." };
+  const { error } = await db.rpc("manage_category", {
+    p_id: parsed.data.id,
+    p_version: parsed.data.version,
+    p_name: deleting ? null : name.data,
+    p_delete: deleting,
+  });
+  if (error)
+    return {
+      error:
+        error.code === "23505"
+          ? "يوجد تصنيف آخر بنفس الاسم."
+          : error.message.includes("category_in_use")
+            ? "لا يمكن حذف التصنيف؛ توجد فساتين مرتبطة به، بما فيها المؤرشفة."
+            : /category_stale|category_not_found/.test(error.message)
+              ? "تغير التصنيف أو حُذف بعد فتح الصفحة. أعد تحميلها قبل التعديل."
+              : "تعذر تأكيد النتيجة. راجع التصنيف والسجل ثم أعد المحاولة.",
+    };
+  for (const path of ["/", "/workspace", "/workspace/categories"])
+    revalidatePath(path);
+  revalidatePath("/dresses/[id]", "page");
+  revalidatePath("/workspace/dresses/[id]", "page");
+  return {
+    success: deleting
+      ? "حُذف التصنيف غير المستخدم دون حذف فساتين أو حجوزات."
+      : "حُفظ اسم التصنيف، وسُجل التغيير في سجل النشاط.",
   };
 }

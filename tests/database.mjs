@@ -950,6 +950,131 @@ try {
       );
     },
   );
+  await check(
+    "category management is admin-only, versioned and preserves used categories",
+    async () => {
+      const used = (
+        await asUser(
+          admin,
+          "select c.id,c.name,c.version from public.categories c join public.dresses d on d.category_id=c.id limit 1",
+        )
+      ).rows[0];
+      const category = (
+        await asUser(
+          admin,
+          "insert into public.categories(name) values('Unused category for local tests') returning id,version",
+        )
+      ).rows[0];
+      await deny(
+        employee,
+        "select public.manage_category($1,1,'Employee rename',false)",
+        [category.id],
+        /not_authorized/,
+      );
+      await deny(
+        admin,
+        "update public.categories set name='Bypass' where id=$1",
+        [category.id],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "delete from public.categories where id=$1",
+        [category.id],
+        /permission denied/,
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.manage_category($1,1,'Renamed category',false) as v",
+            [category.id],
+          )
+        ).rows[0].v,
+        2,
+      );
+      await deny(
+        admin,
+        "select public.manage_category($1,1,'Stale edit',false)",
+        [category.id],
+        /category_stale/,
+      );
+      await deny(
+        admin,
+        "select public.manage_category($1,2,$2,false)",
+        [category.id, used.name],
+        /unique|duplicate/,
+      );
+      await deny(
+        admin,
+        "select public.manage_category($1,2,'   ',false)",
+        [category.id],
+        /invalid_category/,
+      );
+      await deny(
+        admin,
+        "select public.manage_category($1,$2,null,true)",
+        [used.id, used.version],
+        /category_in_use/,
+      );
+      await asUser(
+        admin,
+        "update public.dresses set archived=true where category_id=$1",
+        [used.id],
+      );
+      await deny(
+        admin,
+        "select public.manage_category($1,$2,null,true)",
+        [used.id, used.version],
+        /category_in_use/,
+      );
+      await asUser(admin, "select public.manage_category($1,2,null,true)", [
+        category.id,
+      ]);
+      assert.equal(
+        (
+          await asUser(admin, "select id from public.categories where id=$1", [
+            category.id,
+          ])
+        ).rowCount,
+        0,
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select count(*)::int n from public.activity_logs where entity='categories' and entity_id=$1",
+            [category.id],
+          )
+        ).rows[0].n,
+        3,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.manage_category(uuid,integer,text,boolean)','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      const race = (
+        await asUser(
+          admin,
+          "insert into public.categories(name) values('Concurrent category') returning id",
+        )
+      ).rows[0];
+      const results = await parallelAsUser(
+        "select public.manage_category($1,1,$2,false)",
+        [
+          [race.id, "First rename"],
+          [race.id, "Second rename"],
+        ],
+        admin,
+      );
+      assert.equal(results.filter((r) => r.ok).length, 1);
+      assert.match(results.find((r) => !r.ok).error.message, /category_stale/);
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,

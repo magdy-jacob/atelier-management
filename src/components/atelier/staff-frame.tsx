@@ -30,6 +30,7 @@ export function StaffFrame({
           ["/workspace/customers", "العملاء"],
           ["/workspace/activity", "سجل النشاط"],
           ["/workspace/team", "الفريق"],
+          ["/workspace/categories", "التصنيفات"],
         ]
       : []),
   ];
@@ -58,7 +59,13 @@ export function StaffFrame({
           {links.map(([href, label]) => (
             <Link
               key={href}
-              href={preview ? "/demo" : href}
+              href={
+                preview
+                  ? href === "/workspace/categories"
+                    ? "/demo/categories"
+                    : "/demo"
+                  : href
+              }
               className={`rounded-full border px-4 py-2 text-xs ${active === href ? "border-primary bg-primary text-white" : "bg-white text-muted-foreground"}`}
             >
               {label}

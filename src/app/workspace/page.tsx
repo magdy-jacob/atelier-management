@@ -87,6 +87,12 @@ export default async function Workspace({
               </Link>
               <Link
                 className="rounded-full border bg-white px-4 py-2"
+                href="/workspace/categories"
+              >
+                إدارة التصنيفات
+              </Link>
+              <Link
+                className="rounded-full border bg-white px-4 py-2"
                 href="/workspace/activity"
               >
                 سجل النشاط

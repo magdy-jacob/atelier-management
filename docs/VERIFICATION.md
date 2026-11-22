@@ -7,9 +7,9 @@ Checked on 22 November 2026. This record applies to the source archive's local v
 - `npm run lint`: no ESLint errors or warnings.
 - `npm run typecheck`: TypeScript passes.
 - `npm test`: 22 domain/image/timezone/operations/aggregate/prototype tests pass.
-- `npm run test:db`: 54 checks pass against a temporary real local PostgreSQL instance. Auth and Storage schemas are local substitutes, not live Supabase services.
+- `npm run test:db`: 63 checks pass against a temporary real local PostgreSQL instance. Auth and Storage schemas are local substitutes, not live Supabase services.
 - `npm run build`: optimized Next.js build passes.
-- `npm run test:e2e`: 10 browser scenarios pass in Chrome, covering desktop/mobile, filters, dress details, no public price, demo role presentation, overlap rejection, first available date, accepted local simulation, calendar, disabled login before configuration and a closed unconfigured workspace.
+- `npm run test:e2e`: 11 browser scenarios pass in Chrome, covering desktop/mobile, filters, dress details, no public price, demo role presentation, overlap rejection, first available date, accepted local simulation, calendar, disabled login before configuration and a closed unconfigured workspace.
 - Dependency audit: no known vulnerabilities reported at verification time, after overriding the CLI's vulnerable transitive minimatch version. The lockfile records the tested graph. An audit is not a guarantee of application security.
 
 ## Database checks include
@@ -105,3 +105,9 @@ Migration 6 adds per-admin notification read records, RLS, audit and role-checke
 The local suite passes 54 PostgreSQL checks, 22 unit tests and 10 Chrome scenarios, plus lint, typecheck and production build. The fee RPC rejects employees, anonymous execute, disabled booking configuration, null request IDs, zero amounts, non-overdue or returned bookings and changed retry payloads. Direct fee insert is denied even to admin application tokens. Exact and concurrent identical retries return the same fee. Adding a fee changes outstanding amounts without creating a receipt. Old demo fee records receive request IDs, with seed totals unchanged before disposable tests mutate their own temporary database.
 
 The fee form is shown only on overdue notifications. It asks for amount, reason and an explicit confirmation, distinguishes a receivable from a receipt, preserves its request ID across unsuccessful attempts and catches uncertain network results. Prototype mode independently blocks its server action. Browser scenarios check a filled, confirmed but disabled prototype preview and absence on today's-return alerts. Actual desktop/mobile fee-form pixels were inspected. This does not establish a live authenticated action/UI acceptance; deployment must apply migration 7 and test separately without erasing persistent review fixtures. No real fee, payment or customer transaction was created by these local tests.
+
+## Category management 0.10.0
+
+The current local checkpoint passes lint, typecheck, production build, 22 unit tests, 63 PostgreSQL checks and 11 Chrome scenarios. Category checks cover admin rename/version increment, denied stale update, employee RPC denial, anonymous execute denial, duplicate/blank name rejection, direct app-token update/delete denial, used-category deletion rejection even after archiving its dresses, successful unused deletion and three audit records across create/rename/delete. Two simultaneous updates with the same version yield one success and one stale rejection.
+
+Desktop/mobile category previews were inspected at actual pixels: create, rename, used-category explanation, deletion confirmation and disabled preview controls are readable without horizontal overflow. An unconfigured unauthenticated protected category route redirects to login. Authenticated hosted UI and live RPC acceptance remain the deployment operator's work. No live category, dress, booking or financial row was changed by these local tests.

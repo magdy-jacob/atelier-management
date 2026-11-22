@@ -22,7 +22,7 @@ function Feedback({ state }: { state: ActionState }) {
       {state.success && (
         <p
           role="status"
-          className="rounded-lg bg-green-50 p-3 text-xs leading-7 text-green-800"
+          className="rounded-lg bg-pink-50 p-3 text-xs leading-7 text-pink-800"
         >
           {state.success}
         </p>

@@ -126,7 +126,7 @@ export function CategoryManager({
       {success && (
         <p
           role="status"
-          className="rounded-xl bg-green-50 p-4 text-xs leading-7 text-green-900"
+          className="rounded-xl bg-pink-50 p-4 text-xs leading-7 text-pink-900"
         >
           {success}
         </p>

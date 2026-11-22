@@ -21,7 +21,7 @@ function Feedback({ state }: { state: ActionState }) {
       {state.success && (
         <p
           role="status"
-          className="rounded-xl border border-green-200 bg-green-50 p-4 text-xs leading-7 text-green-800"
+          className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7 text-pink-800"
         >
           {state.success}
         </p>
@@ -61,7 +61,7 @@ export function LiveBookingForm({
     >
       <input name="request_id" type="hidden" value={requestId} />
       {!enabled && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-7">
+        <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
           الحفظ الفعلي غير مفعل بعد. الحجز بالأيام بتوقيت مصر، وقبل الخروج بيوم
           على الأقل، ويُحجز يوم كامل للتجهيز بعد العودة. يلزم إتمام اختبارات
           الربط قبل تفعيل الحفظ. وصف طريقة الاستلام اختياري ولا يوجد تحصيل
@@ -211,7 +211,7 @@ export function LivePaymentForm({
         لا يخصم هذا النموذج أموالًا من أي حساب. سجّل فقط ما استلمته بالفعل.
       </p>
       {!enabled && (
-        <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-7">
+        <p className="mb-5 rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
           التسجيل متوقف لحين إتمام اختبارات الربط وتفعيل الحفظ، أو لأن حالة
           الحجز لا تقبل دفعة. وصف الطريقة اختياري.
         </p>

@@ -6,10 +6,10 @@ Checked on 22 November 2026. This record applies to the source archive's local v
 
 - `npm run lint`: no ESLint errors or warnings.
 - `npm run typecheck`: TypeScript passes.
-- `npm test`: 22 domain/image/timezone/operations/aggregate/prototype tests pass.
-- `npm run test:db`: 66 checks pass against a temporary real local PostgreSQL instance. Auth and Storage schemas are local substitutes, not live Supabase services.
+- `npm test`: 24 domain/image/timezone/operations/aggregate/prototype/workflow tests pass.
+- `npm run test:db`: 88 checks pass against a temporary real local PostgreSQL instance. Auth and Storage schemas are local substitutes, not live Supabase services.
 - `npm run build`: optimized Next.js build passes.
-- `npm run test:e2e`: 12 browser scenarios pass in Chrome, covering desktop/mobile, filters, dress details, no public price, demo role presentation, overlap rejection, first available date, accepted local simulation, calendar, disabled login before configuration and a closed unconfigured workspace.
+- `npm run test:e2e`: 14 browser scenarios pass in Chrome, covering desktop/mobile, filters, dress details, no public price, demo role presentation, overlap rejection, first available date, accepted local simulation, calendar, disabled login before configuration and a closed unconfigured workspace.
 - Dependency audit: no known vulnerabilities reported at verification time, after overriding the CLI's vulnerable transitive minimatch version. The lockfile records the tested graph. An audit is not a guarantee of application security.
 
 ## Database checks include
@@ -117,3 +117,13 @@ Desktop/mobile category previews were inspected at actual pixels: create, rename
 The current checkpoint passes 66 local PostgreSQL checks and 12 Chrome scenarios. The added fixture has an overdue/out rental followed by a permitted planned booking tomorrow for the same dress. The critical notice links that booking; repeated read marking keeps the active warning visible. Employee access and a wrong event date are denied. Reading the warning leaves every booking field unchanged. Manually cancelling the disposable next fixture or moving it beyond tomorrow removes the current cause; those changes are test-owner actions, never automatic effects of the feature.
 
 Desktop/mobile critical warning pixels were inspected: red outline, important heading, affected booking link/date, explicit notification-only explanation and disabled preview mark control. The schema now accepts four alert kinds and the fixed preview includes four cards. This remains limited to current `out` records. Post-return effects require the forthcoming actual-return workflow/date; this checkpoint is not full return/collision acceptance.
+
+## Lovely identity and handover/return 0.12.0
+
+Current local checkpoint: 24 unit tests, 88 PostgreSQL checks and 14 Chrome scenarios, plus lint, typecheck, production build and npm audit. Operational tests verify deposit-only handover, no-deposit/missing-guarantee/readiness denial, exact retries, status-only guarantee records, balance-gated return, valid/invalid multi-select inspection, RLS/direct-mutation denial, and a concurrent fee/return race with only one permitted winner. No real financial or customer transaction is involved.
+
+An important collision is kept visible after a late recorded return during its preparation impact, survives read marking and expires after the relevant window. An older return does not overwrite outside status while a later booking is still out. A new booking starting the next day is rejected by actual-return preparation; the +2 date is suggested and accepted. Existing-booking handover is not automatically held by a collision. Readiness cannot be confirmed before the full preparation day. The local test owner shifts only disposable record dates to simulate the later-day boundary; application actors cannot edit those append-only records.
+
+Inspected pixels cover Lovely catalogue desktop/mobile, actual supplied logo in header/footer/favicon, staff/demo navigation and dashboard, handover/return forms, categories and post-return critical warning. A visual check found the larger fixed-sidebar logo underneath the sticky test banner. Sidebar offset now follows actual banner height, and a browser assertion checks the logo is below it. Mobile navigation also shows the supplied identity. Key palette contrast calculations: primary #a61d55 on white 7.17:1, muted #76616b on #fff9fb 5.47:1, and dark text #25171e on #fce5ee 14.41:1. These checks are not a claim of a complete accessibility audit.
+
+Browser workflow scenarios use explicitly synthetic disabled previews. Hosted authenticated action/save feedback, actual Supabase API role checks and protected deployment acceptance remain required separately. Review fixtures must be preserved in transactional acceptance. Ten migrations in total; apply only migration 10 atop the preceding nine.

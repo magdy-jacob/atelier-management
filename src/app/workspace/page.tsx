@@ -124,10 +124,11 @@ export default async function Workspace({
             حجز جديد
           </Link>
         </nav>
-        <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-xs leading-7">
+        <p className="rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
           يتاح للأدمن إضافة الفساتين وتحريرها وأرشفتها ورفع صورها. التشغيل
-          الكامل للتسليم والمدفوعات والإلغاء وإدارة الموظفين لم يُوصل بالواجهة
-          بعد. لا تستخدم بيانات عملاء حقيقية قبل اختبارات القبول.
+          التشغيلي والمالي معطل في نسخة الاختبار، وباقي الإلغاء وإدارة الموظفين
+          والتقارير ضمن التطوير. لا تستخدم بيانات عملاء حقيقية قبل اختبارات
+          القبول.
         </p>
         {(categoryError || dressError || bookingError) && (
           <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">

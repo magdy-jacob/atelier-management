@@ -95,7 +95,7 @@ export function Catalogue({ dresses }: { dresses: Dress[] }) {
               key={d.id}
               className="dress-card group block"
             >
-              <div className="relative mb-4 aspect-[4/5] overflow-hidden rounded-2xl bg-[#eaeae3]">
+              <div className="relative mb-4 aspect-[4/5] overflow-hidden rounded-2xl bg-[#f9e7ef]">
                 <Image
                   className="dress-image object-cover"
                   src={d.image}
@@ -105,10 +105,10 @@ export function Catalogue({ dresses }: { dresses: Dress[] }) {
                   priority={i < 3}
                 />
                 <Badge
-                  className={`absolute top-3 right-3 rounded-full border-0 px-3 py-1.5 text-[10px] ${d.availability === "available" ? "bg-white/90 text-primary" : "bg-[#e9e3d9]/95 text-[#695d47]"}`}
+                  className={`absolute top-3 right-3 rounded-full border-0 px-3 py-1.5 text-[10px] ${d.availability === "available" ? "bg-white/90 text-primary" : "bg-[#f8d8e6]/95 text-[#7d2148]"}`}
                 >
                   {d.availability === "available" && (
-                    <span className="size-1.5 rounded-full bg-[#6f8b64]" />
+                    <span className="size-1.5 rounded-full bg-[#b1245d]" />
                   )}
                   {availabilityLabels[d.availability]}
                 </Badge>

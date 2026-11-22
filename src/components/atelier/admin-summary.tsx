@@ -90,7 +90,7 @@ export function AdminSummary({
           ))}
         </div>
       </section>
-      <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-xs leading-7">
+      <p className="rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
         الملخص للأدمن فقط. لا يغيّر أي سجل ولا يشغّل الحجوزات. مركز الإشعارات
         المحفوظ وحالة القراءة، والتسليم والعودة والإلغاء والاسترداد والتقارير
         والتصدير ما زالت مسارات منفصلة مطلوب استكمالها؛ هذه الشاشة لا تعني

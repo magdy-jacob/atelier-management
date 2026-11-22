@@ -37,7 +37,7 @@ function Message({ state }: { state: ActionState }) {
       {state.success && (
         <p
           role="status"
-          className="rounded-xl border border-green-200 bg-green-50 p-4 text-xs leading-7 text-green-800"
+          className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7 text-pink-800"
         >
           {state.success}
         </p>

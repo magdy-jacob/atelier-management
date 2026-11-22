@@ -9,8 +9,10 @@ import { NotificationList } from "@/components/atelier/notification-list";
 import { StaffFrame } from "@/components/atelier/staff-frame";
 export default async function NotificationPreview({
   params,
+  searchParams,
 }: {
   params: Promise<{ kind?: string[] }>;
+  searchParams: Promise<{ returned?: string }>;
 }) {
   const parts = (await params).kind ?? [];
   if (parts.length > 1) notFound();
@@ -63,6 +65,9 @@ export default async function NotificationPreview({
       read_at: null,
     },
   ].filter((i) => !filter || i.kind === filter) as OperationalNotification[];
+  if ((await searchParams).returned === "1")
+    for (const item of items)
+      if (item.kind === "collision") item.actual_returned_on = "2026-12-05";
   return (
     <StaffFrame
       preview

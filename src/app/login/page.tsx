@@ -18,7 +18,7 @@ export default function Login() {
             دخول الأدمن والموظفين فقط. لا يوجد تسجيل عام.
           </p>
           {!ready && (
-            <p className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-7">
+            <p className="mb-6 rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
               المشروع لم يُربط بـ Supabase بعد. لن يعمل الدخول قبل تهيئة قاعدة
               البيانات وإنشاء الحسابات.
             </p>

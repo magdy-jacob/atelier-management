@@ -54,7 +54,7 @@ export function LateFeeForm({
           المستحق في السجل، ولا يخصم أموالًا أو يرسل رسالة للعميل.
         </p>
         {!enabled && (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-7">
+          <p className="rounded-xl border border-pink-200 bg-pink-50 p-3 text-xs leading-7">
             الإضافة المالية معطلة في نسخة الاختبار. هذه الحقول للمراجعة فقط.
           </p>
         )}
@@ -104,7 +104,7 @@ export function LateFeeForm({
           </p>
         )}
         {state.success && (
-          <p role="status" className="text-xs leading-7 text-green-900">
+          <p role="status" className="text-xs leading-7 text-pink-900">
             {state.success}
           </p>
         )}

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowDown, ArrowUpLeft, Sparkles, Flower2 } from "lucide-react";
+import { ArrowDown, ArrowUpLeft, Sparkles, Heart } from "lucide-react";
 import { Header, DemoNotice, Brand } from "@/components/atelier/chrome";
 import { Catalogue } from "@/components/atelier/catalogue";
 import { getCatalogue } from "@/lib/catalogue";
@@ -21,7 +21,7 @@ export default async function Home() {
             <h1 className="text-4xl leading-[1.7] font-medium tracking-tight sm:text-5xl md:text-[56px]">
               لكل لحظة حلوة،
               <br />
-              <span className="text-[#78876b]">فستان يحكيها.</span>
+              <span className="text-[#a61d55]">فستان يحكيها.</span>
             </h1>
             <p className="mt-5 max-w-sm text-sm leading-8 text-muted-foreground">
               تصفّحي المجموعة، واختاري اللي يشبهك.
@@ -43,7 +43,7 @@ export default async function Home() {
               <span>الحجز من خلال الأتيليه فقط</span>
             </div>
           </div>
-          <div className="relative min-h-[350px] overflow-hidden rounded-t-[150px] bg-[#e9e9e0] sm:min-h-[450px] md:min-h-[520px]">
+          <div className="relative min-h-[350px] overflow-hidden rounded-t-[150px] bg-[#fce5ee] sm:min-h-[450px] md:min-h-[520px]">
             <Image
               src="/dresses/sage-demo.webp"
               alt="صورة مولدة لفستان سهرة أخضر للتجربة، ليست من مخزون حقيقي"
@@ -53,7 +53,7 @@ export default async function Home() {
               sizes="(max-width:768px) 100vw, 50vw"
             />
             <div className="absolute bottom-7 right-6 flex items-center gap-3 rounded-xl border border-white/60 bg-white/85 p-4 backdrop-blur">
-              <Flower2 className="size-8 text-primary" strokeWidth={1} />
+              <Heart className="size-8 text-primary" strokeWidth={1} />
               <div>
                 <p className="mb-1 text-sm">جمالك في تفاصيلك</p>
                 <p className="text-[10px] text-muted-foreground">
@@ -63,7 +63,7 @@ export default async function Home() {
             </div>
           </div>
         </section>
-        <div className="mt-8 border-y bg-[#f0f0e9] px-5 py-5 text-center text-xs leading-6 text-primary">
+        <div className="mt-8 border-y bg-[#fcf0f5] px-5 py-5 text-center text-xs leading-6 text-primary">
           سهرة <span className="mx-5 opacity-30">✦</span> خطوبة{" "}
           <span className="mx-5 opacity-30">✦</span> أفراح{" "}
           <span className="mx-5 opacity-30">✦</span> لحظات تستاهل
@@ -78,7 +78,7 @@ export default async function Home() {
         ) : (
           <Catalogue dresses={dresses} />
         )}
-        <section className="mx-5 mb-12 rounded-2xl bg-[#e9ede3] px-6 py-12 text-center md:mx-auto md:max-w-6xl">
+        <section className="mx-5 mb-12 rounded-2xl bg-[#fce5ee] px-6 py-12 text-center md:mx-auto md:max-w-6xl">
           <p className="mb-3 text-[10px] tracking-[.2em]" dir="ltr">
             MADE FOR YOUR MOMENT
           </p>

@@ -63,7 +63,7 @@ export async function NotificationsPage({
       active="/workspace/notifications"
     >
       <NotificationTabs filter={filter} />
-      <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-7">
+      <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
         تجهيز وخروج يبدأ قبل الموعد بيوم ويظل ظاهرًا إذا لم يسجل التسليم. العودة
         تظهر في يومها، والتأخير بعد تجاوزه ما دام الفستان مسجلًا خارج الأتيليه.
         قراءة التنبيه لا تغير الحجز ولا تحسب غرامة. أعد تحميل الصفحة لتحديث

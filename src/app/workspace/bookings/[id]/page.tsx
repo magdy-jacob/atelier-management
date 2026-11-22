@@ -1,5 +1,11 @@
+import { BookingWorkflow } from "@/components/atelier/booking-workflow";
+import { workflowSchema } from "@/lib/workflow";
 import { money } from "@/lib/domain";
-import { getBookingConfig, bookingConfigReady } from "@/lib/booking-config";
+import {
+  getBookingConfig,
+  bookingConfigReady,
+  workflowReady,
+} from "@/lib/booking-config";
 import { LivePaymentForm } from "@/components/atelier/live-booking-forms";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
@@ -40,12 +46,29 @@ export default async function BookingDetails({
       .eq("booking_id", id),
   ]);
   const config = await getBookingConfig(db);
+  const { data: workflowRaw, error: workflowError } = await db.rpc(
+    "get_booking_workflow",
+    { p_booking_id: id },
+  );
+  const workflow = !workflowError
+    ? workflowSchema.safeParse(workflowRaw)
+    : null;
+  const feeTotal = (fees ?? []).reduce(
+    (sum, f) => sum + BigInt(String(f.amount_piasters)),
+    BigInt(0),
+  );
+  const paidTotal = (payments ?? []).reduce(
+    (sum, p) => sum + BigInt(String(p.amount_piasters)),
+    BigInt(0),
+  );
+  const remaining =
+    BigInt(String(b.agreed_price_piasters)) + feeTotal - paidTotal;
   const dress = Array.isArray(b.dresses) ? b.dresses[0] : b.dresses;
   const customer = Array.isArray(b.customers) ? b.customers[0] : b.customers;
   return (
     <StaffFrame
       title={`حجز ${dress?.name ?? ""}`}
-      description="تفاصيل الحجز وسجل مبالغه المستلمة والمستحقة ضمن صلاحيات الحساب. لا تحصيل إلكتروني. التسليم والعودة والإلغاء والاسترداد لم تُفعّل بعد."
+      description="تفاصيل الحجز وسجل مبالغه المستلمة والمستحقة ضمن صلاحيات الحساب. لا تحصيل إلكتروني. التسليم والعودة والفحص بحسب الصلاحيات. الإلغاء والاسترداد لم يُفعّلا بعد."
       name={profile.full_name}
       role={profile.role}
       active="/workspace"
@@ -93,10 +116,7 @@ export default async function BookingDetails({
         <>
           <BookingLedger
             price={Number(b.agreed_price_piasters)}
-            fees={(fees ?? []).reduce(
-              (sum, f) => sum + Number(f.amount_piasters),
-              0,
-            )}
+            fees={feeTotal.toString()}
             payments={payments ?? []}
           />
           {!!fees?.length && (
@@ -124,7 +144,25 @@ export default async function BookingDetails({
           }
         />
       )}
-      <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-xs leading-7">
+      {!paymentError &&
+        !feeError &&
+        (workflow?.success ? (
+          <BookingWorkflow
+            key={b.id}
+            bookingId={b.id}
+            dressId={b.dress_id}
+            status={b.status}
+            startsOn={b.starts_on}
+            returnsOn={b.returns_on}
+            paid={paidTotal.toString()}
+            remaining={remaining.toString()}
+            data={workflow.data}
+            enabled={workflowReady(config)}
+          />
+        ) : (
+          <Unavailable />
+        ))}
+      <p className="rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
         العمليات والتقويم يستخدمان أيام مصر. الحالة المسجلة هنا لا تتغير تلقائيًا
         مع مرور الموعد؛ يلزم إجراء تسليم أو عودة معتمد.
       </p>

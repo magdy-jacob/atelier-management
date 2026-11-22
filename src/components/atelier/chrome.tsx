@@ -1,25 +1,30 @@
 import Link from "next/link";
-import { ArrowUpLeft, Flower2 } from "lucide-react";
+import Image from "next/image";
+import { ArrowUpLeft } from "lucide-react";
 export function Brand({ dark = false }: { dark?: boolean }) {
   return (
     <Link
       href="/"
-      className={`flex items-center gap-3 ${dark ? "text-white" : "text-primary"}`}
+      aria-label="Lovely، الصفحة الرئيسية"
+      className={`flex items-center gap-2 md:gap-3 ${dark ? "text-white" : "text-primary"}`}
     >
-      <span
-        className={`grid size-10 place-items-center rounded-full border ${dark ? "border-white/25" : "border-primary/25"}`}
-      >
-        <Flower2 size={22} />
-      </span>
+      <Image
+        src="/brand/lovely-logo.webp"
+        alt="شعار Lovely لتأجير وتفصيل الفساتين"
+        width={72}
+        height={72}
+        priority
+        className="size-14 shrink-0 rounded-full border border-primary/15 object-cover md:size-[72px]"
+      />
       <span>
-        <span className="block text-xl font-semibold leading-tight">
-          أتيليه
-        </span>
         <span
-          className="block text-[9px] tracking-[.32em] opacity-60"
+          className="serif block text-2xl font-semibold italic leading-tight md:text-3xl"
           dir="ltr"
         >
-          THE DRESS EDIT
+          Lovely
+        </span>
+        <span className="mt-1 block text-[9px] leading-5 opacity-80">
+          تأجير وتفصيل الفساتين
         </span>
       </span>
     </Link>
@@ -54,10 +59,10 @@ export function Header() {
 }
 export function DemoNotice({ short = false }: { short?: boolean }) {
   return (
-    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] leading-6 text-amber-950">
+    <div className="border-b border-pink-200 bg-pink-50 px-4 py-2 text-center text-[11px] leading-6 text-pink-950">
       {short
         ? "بيئة عرض فقط • كل الأسماء والأرقام والعمليات تجريبية"
-        : "نسخة أولية للعرض • بيانات وصور مولدة للتجربة وليست مخزونًا أو حجوزات حقيقية • اسم الأتيليه قابل للتغيير"}
+        : "نسخة أولية للعرض • بيانات وصور مولدة للتجربة وليست مخزونًا أو حجوزات حقيقية"}
     </div>
   );
 }

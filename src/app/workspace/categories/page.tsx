@@ -44,7 +44,7 @@ export default async function Categories() {
           {(count ?? 0) > 200 && (
             <p
               role="alert"
-              className="rounded-xl bg-amber-50 p-4 text-xs leading-7"
+              className="rounded-xl bg-pink-50 p-4 text-xs leading-7"
             >
               يعرض أول ٢٠٠ تصنيف فقط. توجد تصنيفات أخرى غير معروضة؛ هذه ليست
               القائمة الكاملة.

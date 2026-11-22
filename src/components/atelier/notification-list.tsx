@@ -69,9 +69,10 @@ function NotificationItem({
         <div className="mb-5 space-y-3 rounded-xl border border-red-200 bg-white p-4 text-xs leading-7 text-red-950">
           <h3 className="font-semibold">تنبيه مهم للأدمن: راجع الحجز التالي</h3>
           <p>
-            الفستان ما زال مسجلًا خارج الأتيليه بعد موعد العودة، وأقرب حجز تالٍ
-            اقترب أو بدأ موعده. راجع تأثير التأخير ويوم التجهيز مع المسؤول عن
-            الحجز.
+            {item.actual_returned_on
+              ? `سُجلت العودة في ${formatDay(item.actual_returned_on)} بعد الموعد المخطط. ما زال الحجز التالي يتأثر بيوم التجهيز المسجل.`
+              : "الفستان ما زال مسجلًا خارج الأتيليه بعد موعد العودة، وأقرب حجز تالٍ اقترب أو بدأ موعده."}{" "}
+            راجع أثر التأخير ويوم التجهيز مع المسؤول عن الحجز.
           </p>
           {item.related_starts_on && (
             <p>بداية الحجز المتأثر: {formatDay(item.related_starts_on)}</p>
@@ -108,7 +109,7 @@ function NotificationItem({
           </p>
         )}
         {state.success && (
-          <p role="status" className="text-xs leading-7 text-green-900">
+          <p role="status" className="text-xs leading-7 text-pink-900">
             {state.success}
           </p>
         )}

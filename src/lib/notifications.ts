@@ -23,6 +23,7 @@ export const notificationSchema = z.object({
   read_at: z.string().nullable(),
   related_booking_id: z.string().nullable().optional(),
   related_starts_on: z.string().nullable().optional(),
+  actual_returned_on: z.string().nullable().optional(),
 });
 export const notificationResultSchema = z.object({
   today: z.string(),

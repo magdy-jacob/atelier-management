@@ -54,6 +54,17 @@ test("demo role separation, conflict rejection, accepted booking and calendar", 
   await page
     .getByRole("heading", { name: "كل تفاصيل يومك، في مكان واحد." })
     .waitFor();
+  await expect
+    .poll(async () => {
+      const logo = await page
+        .getByRole("link", { name: "Lovely، الصفحة الرئيسية", exact: true })
+        .boundingBox();
+      const banner = await page
+        .getByRole("note", { name: "نسخة اختبار فقط" })
+        .boundingBox();
+      return !!logo && !!banner && logo.y >= banner.y + banner.height;
+    })
+    .toBeTruthy();
   await page.screenshot({
     path: "evidence/dashboard-desktop.png",
     fullPage: true,
@@ -517,4 +528,94 @@ test("critical collision notice is prominent and does not promise an automatic h
     ),
   ).toBeTruthy();
   expect(errors).toEqual([]);
+});
+
+test("Lovely identity and status-only handover/return preview are readable and cannot submit", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/workflow?view=handover");
+  await expect(
+    page.getByRole("img", {
+      name: "شعار Lovely لتأجير وتفصيل الفساتين",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText(/يكفي مقدم مستلم ومسجل/)).toBeVisible();
+  await page.getByRole("checkbox").first().check();
+  await page.getByRole("checkbox").nth(1).check();
+  await expect(
+    page.getByRole("button", { name: "تأكيد خروج الفستان", exact: true }),
+  ).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/handover-desktop.png",
+    fullPage: true,
+  });
+  await page.goto("/demo/workflow?view=return");
+  await page.getByLabel("نتيجة فحص العودة").selectOption("maintenance");
+  await page.getByLabel("إكسسوارات", { exact: true }).check();
+  await page.getByLabel("سوستة", { exact: true }).check();
+  await expect(page.locator('input[name="issues"]:checked')).toHaveCount(2);
+  await page.getByRole("checkbox").last().check();
+  await expect(
+    page.getByRole("button", {
+      name: "تأكيد العودة والفحص ورد الضمان",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await expect(
+    page.locator('input[type="text"],input[type="number"]'),
+  ).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/return-desktop.png",
+    fullPage: true,
+  });
+  await page.getByLabel("نتيجة فحص العودة").selectOption("sound");
+  await expect(page.locator('input[name="issues"]')).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/demo/workflow?view=return");
+  await page.getByLabel("نتيجة فحص العودة").selectOption("maintenance");
+  await page.getByLabel("إكسسوارات", { exact: true }).check();
+  await page.getByLabel("سوستة", { exact: true }).check();
+  await page.getByRole("checkbox").last().check();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: "evidence/return-mobile.png", fullPage: true });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/demo/workflow?view=unpaid");
+  await expect(
+    page.getByText(/لا يمكن إتمام العودة أو إغلاقها قبل/),
+  ).toBeVisible();
+  await page.goto("/demo/workflow?view=returned");
+  await expect(page.getByText(/استلام مسجل/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "تأكيد اكتمال التجهيز", exact: true }),
+  ).toBeDisabled();
+  await page.goto("/workspace/bookings/demo-booking");
+  await expect(page).toHaveURL(/login/);
+  expect(errors).toEqual([]);
+});
+
+test("a recorded late return keeps its critical preparation impact visible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/notifications/collision?returned=1");
+  await expect(page.getByText(/سُجلت العودة في/)).toBeVisible();
+  await expect(
+    page.getByText(/ما زال الحجز التالي يتأثر بيوم التجهيز المسجل/),
+  ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "evidence/collision-after-return.png",
+    fullPage: true,
+  });
 });

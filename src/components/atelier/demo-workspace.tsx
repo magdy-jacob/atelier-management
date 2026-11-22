@@ -83,7 +83,7 @@ const policies = [
   ],
   [
     "بيانات الأتيليه",
-    "اسم الأتيليه، الشعار، صور الفساتين الحقيقية وبيانات التواصل.",
+    "صور الفساتين الحقيقية وبيانات التواصل؛ اعتُمدت هوية Lovely وشعارها وألوانها.",
   ],
 ];
 function Status({ booking }: { booking: Booking }) {
@@ -98,7 +98,7 @@ function Status({ booking }: { booking: Booking }) {
       }[booking.status];
   return (
     <Badge
-      className={`border-0 px-3 py-1 ${late ? "bg-red-50 text-red-700" : booking.status === "out" ? "bg-amber-50 text-amber-800" : "bg-[#eef2e9] text-primary"}`}
+      className={`border-0 px-3 py-1 ${late ? "bg-red-50 text-red-700" : booking.status === "out" ? "bg-pink-50 text-pink-800" : "bg-[#fce5ee] text-primary"}`}
     >
       {text}
     </Badge>
@@ -322,7 +322,7 @@ export function DemoWorkspace() {
         </div>
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[690px] text-right text-xs">
-            <thead className="border-b bg-[#fafbf8] text-muted-foreground">
+            <thead className="border-b bg-[#fff9fb] text-muted-foreground">
               <tr>
                 {[
                   "الفستان / الحجز",
@@ -403,12 +403,13 @@ export function DemoWorkspace() {
     );
   }
   return (
-    <div className="min-h-screen bg-[#f6f7f2]">
+    <div className="min-h-screen bg-[#fff9fb]">
       <aside
-        className={`${mobileNav ? "fixed inset-y-0 right-0 z-50 flex" : "hidden"} w-60 flex-col bg-[#303e30] px-5 py-7 text-white lg:fixed lg:inset-y-0 lg:right-0 lg:flex`}
+        style={{ top: "var(--prototype-offset, 0px)" }}
+        className={`${mobileNav ? "fixed inset-y-0 right-0 z-50 flex" : "hidden"} w-60 flex-col overflow-y-auto bg-[#27131e] px-5 py-7 text-white lg:fixed lg:inset-y-0 lg:right-0 lg:flex`}
       >
         <Brand dark />
-        <div className="mt-10 mb-3 px-3 text-[10px] text-[#a5b39e]">
+        <div className="mt-10 mb-3 px-3 text-[10px] text-[#edb7ce]">
           مساحة العمل
         </div>
         <nav className="space-y-2">
@@ -420,7 +421,7 @@ export function DemoWorkspace() {
                 setSearch("");
                 setMobileNav(false);
               }}
-              className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-xs transition-colors ${activeTab === n.id ? "bg-[#edf1e5] text-[#34462e]" : "text-[#d7dece] hover:bg-white/10"}`}
+              className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-xs transition-colors ${activeTab === n.id ? "bg-[#fce5ee] text-[#73143c]" : "text-[#f9d9e7] hover:bg-white/10"}`}
             >
               <n.icon size={17} strokeWidth={1.5} />
               {n.label}
@@ -433,14 +434,14 @@ export function DemoWorkspace() {
           ))}
         </nav>
         <div className="mt-auto space-y-5 pt-10">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-[10px] leading-6 text-[#c7d0bf]">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-[10px] leading-6 text-[#f6cada]">
             بيئة استعراض فقط
             <br />
             لا بيانات حقيقية أو عمليات محفوظة.
           </div>
           <Link
             href="/"
-            className="flex items-center gap-3 px-3 text-xs text-[#d7dece]"
+            className="flex items-center gap-3 px-3 text-xs text-[#f9d9e7]"
           >
             <LogOut size={15} />
             عرض الكتالوج العام
@@ -467,7 +468,10 @@ export function DemoWorkspace() {
             >
               <PanelRightClose size={20} />
             </Button>
-            <span className="text-xs text-muted-foreground">
+            <div className="lg:hidden">
+              <Brand />
+            </div>
+            <span className="hidden text-xs text-muted-foreground lg:inline">
               مساحة العمل <span className="mx-3 opacity-40">/</span>
               <span className="text-foreground">{current.label}</span>
             </span>
@@ -488,9 +492,13 @@ export function DemoWorkspace() {
                 <option value="employee">موظف</option>
               </select>
             </label>
-            <span className="grid size-9 place-items-center rounded-full bg-[#eee8dd] text-xs text-[#796949]">
-              أت
-            </span>
+            <Image
+              src="/brand/lovely-logo.webp"
+              alt="رمز Lovely"
+              width={36}
+              height={36}
+              className="hidden size-9 rounded-full md:block"
+            />
           </div>
         </header>
         <main className="mx-auto max-w-[1500px] px-5 py-7 md:px-9 md:py-9">
@@ -534,7 +542,7 @@ export function DemoWorkspace() {
                       <p className="text-[11px] text-muted-foreground">
                         {s.label}
                       </p>
-                      <s.icon size={17} className="text-[#7d8c72]" />
+                      <s.icon size={17} className="text-[#ad2e65]" />
                     </div>
                     <div className="mb-3 text-2xl font-medium">{s.value}</div>
                     <p className="text-[9px] text-muted-foreground">{s.sub}</p>
@@ -542,7 +550,7 @@ export function DemoWorkspace() {
                 ))}
               </div>
               <div className="mb-7 grid gap-5 xl:grid-cols-[1.55fr_1fr]">
-                <section className="relative overflow-hidden rounded-2xl bg-[#e6ebdd] p-7">
+                <section className="relative overflow-hidden rounded-2xl bg-[#fce5ee] p-7">
                   <div className="relative z-10 max-w-[75%]">
                     <span className="mb-5 inline-block rounded-full bg-white/60 px-3 py-1 text-[9px] text-primary">
                       مساحة مرتّبة ليوم أخف
@@ -552,7 +560,7 @@ export function DemoWorkspace() {
                       <br />
                       حكاية محتاجة اهتمام.
                     </h2>
-                    <p className="mb-6 max-w-xs text-xs leading-7 text-[#6d7865]">
+                    <p className="mb-6 max-w-xs text-xs leading-7 text-[#71475a]">
                       راجع التسليم والعودة قبل بداية اليوم، وتابع الحجوزات اللي
                       محتاجة تجهيز.
                     </p>
@@ -568,7 +576,7 @@ export function DemoWorkspace() {
                   <Shirt
                     size={190}
                     strokeWidth={0.5}
-                    className="absolute -bottom-7 -left-4 -rotate-12 text-[#829570]/25"
+                    className="absolute -bottom-7 -left-4 -rotate-12 text-[#cd5085]/25"
                   />
                 </section>
                 <section className="studio-card p-6">
@@ -590,7 +598,7 @@ export function DemoWorkspace() {
                       className="mb-5 flex items-start gap-3 last:mb-0"
                     >
                       <span
-                        className={`mt-1 size-2 shrink-0 rounded-full ${c === "red" ? "bg-red-400" : c === "amber" ? "bg-amber-400" : "bg-[#839a71]"}`}
+                        className={`mt-1 size-2 shrink-0 rounded-full ${c === "red" ? "bg-red-400" : c === "amber" ? "bg-pink-400" : "bg-[#c53b74]"}`}
                       />
                       <div>
                         <p className="mb-1.5 text-xs">{a}</p>
@@ -722,7 +730,7 @@ export function DemoWorkspace() {
                 {calendarDays.map((day, i) => (
                   <div
                     key={day ?? `blank${i}`}
-                    className={`min-h-24 border-t border-l p-1.5 md:min-h-32 md:p-3 ${day === "2026-12-05" ? "bg-[#edf1e7]" : ""}`}
+                    className={`min-h-24 border-t border-l p-1.5 md:min-h-32 md:p-3 ${day === "2026-12-05" ? "bg-[#fce5ee]" : ""}`}
                   >
                     <div
                       className={`mb-2 text-[10px] ${day === "2026-12-05" ? "font-bold text-primary" : "text-muted-foreground"}`}
@@ -741,7 +749,7 @@ export function DemoWorkspace() {
                           <button
                             key={b.id}
                             onClick={() => setSelected(b)}
-                            className={`mb-1 block w-full truncate rounded p-1 text-right text-[8px] md:text-[9px] ${day > b.end ? "border border-dashed border-amber-300 bg-amber-50 text-amber-800" : "bg-[#dde5d4] text-primary"}`}
+                            className={`mb-1 block w-full truncate rounded p-1 text-right text-[8px] md:text-[9px] ${day > b.end ? "border border-dashed border-pink-300 bg-pink-50 text-pink-800" : "bg-[#f8d4e4] text-primary"}`}
                           >
                             {day > b.end
                               ? "تجهيز"
@@ -809,7 +817,7 @@ export function DemoWorkspace() {
                   </div>
                 ))}
               </div>
-              <div className="mb-6 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-5 text-xs leading-7">
+              <div className="mb-6 flex gap-3 rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
                 <Info size={18} className="mt-1 shrink-0" />
                 ملخص تجريبي للأدمن فقط. لا يعادل الإيراد المحاسبي، ولا يشمل
                 استردادات أو غرامات. سياسات تلك الإجراءات لم تُعتمد.
@@ -833,7 +841,7 @@ export function DemoWorkspace() {
                   >
                     <CircleAlert
                       className={
-                        b.end < "2026-12-05" ? "text-red-500" : "text-[#879774]"
+                        b.end < "2026-12-05" ? "text-red-500" : "text-[#ad2e65]"
                       }
                       size={22}
                     />
@@ -864,7 +872,7 @@ export function DemoWorkspace() {
                 <section key={title} className="studio-card p-6">
                   <Badge
                     variant="outline"
-                    className="mb-4 border-amber-200 bg-amber-50 text-[9px] text-amber-800"
+                    className="mb-4 border-pink-200 bg-pink-50 text-[9px] text-pink-800"
                   >
                     بانتظار قرار
                   </Badge>
@@ -1021,7 +1029,7 @@ export function DemoWorkspace() {
                   </div>
                 ))}
               </dl>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-[11px] leading-7">
+              <div className="rounded-lg border border-pink-200 bg-pink-50 p-4 text-[11px] leading-7">
                 إجراءات الدفع والتسليم والعودة والإلغاء متوقفة في العرض لحين
                 اعتماد السياسات وربط قاعدة البيانات. لا يتم تحصيل أي مبلغ من
                 هنا.

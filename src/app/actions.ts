@@ -567,3 +567,161 @@ export async function manageCategory(
       : "حُفظ اسم التصنيف، وسُجل التغيير في سجل النشاط.",
   };
 }
+
+function refreshWorkflow(bookingId: string) {
+  for (const path of [
+    "/workspace",
+    "/workspace/bookings",
+    `/workspace/bookings/${bookingId}`,
+    "/workspace/operations",
+    "/workspace/dashboard",
+    "/workspace/notifications",
+    "/workspace/notifications/incoming",
+    "/workspace/notifications/outgoing",
+    "/workspace/notifications/overdue",
+    "/workspace/notifications/collision",
+  ])
+    revalidatePath(path);
+}
+function workflowError(message: string) {
+  if (message.includes("outstanding_balance_before_return"))
+    return "لا يمكن إتمام العودة قبل سداد المتبقي كله، شامل أي غرامة مسجلة. سجل الدفعة المستلمة أولًا ثم أعد المحاولة.";
+  if (message.includes("deposit_required"))
+    return "سجّل المقدم المستلم أولًا. لا يشترط سداد باقي الحجز عند التسليم.";
+  if (message.includes("outside_planned_handover_days"))
+    return "التسليم متاح داخل أيام الحجز المخططة فقط. لا تغير التاريخ تلقائيًا؛ راجع الحجز مع الأدمن.";
+  if (message.includes("invalid_inspection"))
+    return "اختر سليم دون أعطال، أو يحتاج صيانة مع نوع واحد على الأقل من القائمة.";
+  if (message.includes("preparation_day_not_finished"))
+    return "يوم التجهيز الكامل بعد يوم الاستلام المسجل لم ينته بعد.";
+  if (message.includes("return_workflow_required"))
+    return "ما زال هناك حجز مسجل خارج الأتيليه. راجع تسجيل العودة أولًا.";
+  if (/request_id_payload_mismatch|request_id_conflict/.test(message))
+    return "معرف المحاولة مسجل ببيانات مختلفة. راجع سجل الحجز قبل أي محاولة جديدة.";
+  if (/booking_not_confirmed|booking_not_out/.test(message))
+    return "تغيرت حالة الحجز. حدّث الصفحة وراجع العملية المسجلة قبل إعادة المحاولة.";
+  return "تعذر تأكيد العملية. راجع سجل الحجز ثم أعد نفس المحاولة دون تغيير القيم. لم يتم تأكيد نجاحها.";
+}
+async function workflowDayValid(form: FormData) {
+  const { dateInZone } = await import("@/lib/domain");
+  return form.get("expected_day") === dateInZone(new Date(), "Africa/Cairo");
+}
+export async function recordBookingHandover(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db } = await requireStaff();
+  if (prototypeEnabled()) return { error: "التسليم معطل في نسخة الاختبار." };
+  if (!(await workflowDayValid(form)))
+    return {
+      error: "تغير اليوم في مصر منذ فتح الشاشة. حدّث الصفحة قبل التسجيل.",
+    };
+  const parsed = z
+    .object({
+      request_id: z.uuid(),
+      booking_id: z.uuid(),
+      card_received: z.literal("on"),
+      ready: z.literal("on"),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return {
+      error:
+        "أكد استلام الضمان وفحص جاهزية الفستان أولًا، دون رقم أو صورة بطاقة.",
+    };
+  const { error } = await db.rpc("record_handover", {
+    p_request_id: parsed.data.request_id,
+    p_booking_id: parsed.data.booking_id,
+    p_card_received: true,
+    p_ready: true,
+  });
+  if (error) return { error: workflowError(error.message) };
+  refreshWorkflow(parsed.data.booking_id);
+  return {
+    success:
+      "سُجل خروج الفستان واستلام الضمان كحالة فقط. يبقى المتبقي مستحقًا عند العودة.",
+  };
+}
+export async function recordBookingReturn(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db } = await requireStaff();
+  if (prototypeEnabled())
+    return { error: "تسجيل العودة معطل في نسخة الاختبار." };
+  if (!(await workflowDayValid(form)))
+    return {
+      error: "تغير اليوم في مصر منذ فتح الشاشة. حدّث الصفحة قبل التسجيل.",
+    };
+  const { inspectionIssues } = await import("@/lib/workflow");
+  const parsed = z
+    .object({
+      request_id: z.uuid(),
+      booking_id: z.uuid(),
+      card_released: z.literal("on"),
+      inspection: z.enum(["sound", "maintenance"]),
+      issues: z.array(z.enum(inspectionIssues)).max(4),
+    })
+    .safeParse({ ...Object.fromEntries(form), issues: form.getAll("issues") });
+  if (!parsed.success)
+    return {
+      error:
+        "راجع الفحص وتأكيد استلام الفستان اليوم ورد الضمان. لا توجد صور أو بيانات هوية مطلوبة.",
+    };
+  const d = parsed.data;
+  if (
+    (d.inspection === "sound" && d.issues.length > 0) ||
+    (d.inspection === "maintenance" && d.issues.length === 0)
+  )
+    return {
+      error:
+        "السليم دون أعطال؛ عند الصيانة اختر نوعًا واحدًا على الأقل ويمكن اختيار أكثر من نوع.",
+    };
+  const { error } = await db.rpc("record_return", {
+    p_request_id: d.request_id,
+    p_booking_id: d.booking_id,
+    p_card_released: true,
+    p_inspection: d.inspection,
+    p_issues: d.issues,
+  });
+  if (error) return { error: workflowError(error.message) };
+  refreshWorkflow(d.booking_id);
+  return {
+    success:
+      "سُجلت العودة والفحص ورد الضمان بعد التحقق من سداد الرصيد كله. راجع حالة الفستان ويوم التجهيز.",
+  };
+}
+export async function confirmDressReady(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { db } = await requireStaff();
+  if (prototypeEnabled())
+    return { error: "تغيير حالة الجاهزية معطل في نسخة الاختبار." };
+  const parsed = z
+    .object({
+      booking_id: z.uuid(),
+      dress_id: z.uuid(),
+      ready: z.literal("on"),
+    })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success)
+    return { error: "أكد اكتمال التجهيز وأي صيانة قبل تغيير الحالة." };
+  const { data: b, error: readError } = await db
+    .from("bookings")
+    .select("dress_id")
+    .eq("id", parsed.data.booking_id)
+    .maybeSingle();
+  if (readError || b?.dress_id !== parsed.data.dress_id)
+    return { error: "تعذر التحقق من الحجز والفستان ضمن صلاحياتك." };
+  const { error } = await db.rpc("set_dress_operation", {
+    p_dress_id: parsed.data.dress_id,
+    p_status: "in_atelier",
+  });
+  if (error) return { error: workflowError(error.message) };
+  refreshWorkflow(parsed.data.booking_id);
+  return {
+    success:
+      "سُجل الفستان جاهزًا داخل الأتيليه. لم يتغير أي حجز أو موعد تلقائيًا.",
+  };
+}

@@ -129,15 +129,15 @@
   }
 }
 :root {
-  --background: #faf9f6;
-  --foreground: #292b27;
-  --primary: #485743;
+  --background: #fff9fb;
+  --foreground: #25171e;
+  --primary: #a61d55;
   --primary-foreground: #fff;
-  --secondary: #edeee8;
-  --muted: #f0f0e9;
-  --muted-foreground: #72766c;
-  --border: #e4e5dc;
-  --ring: #8b9c82;
+  --secondary: #fce5ee;
+  --muted: #fcf0f5;
+  --muted-foreground: #76616b;
+  --border: #efd3df;
+  --ring: #bd326c;
   --radius: 0.8rem;
 }
 body {
@@ -161,7 +161,7 @@ button {
   font-family: Georgia, "Times New Roman", serif;
 }
 .soft-grid {
-  background-image: radial-gradient(#7e8c721c 1px, transparent 1px);
+  background-image: radial-gradient(#e35b9320 1px, transparent 1px);
   background-size: 18px 18px;
 }
 .studio-card {
@@ -197,4 +197,28 @@ button {
   .dress-card:hover .dress-image {
     transform: scale(1.04);
   }
+}
+
+:root {
+  --secondary-foreground: #5c1535;
+  --accent: #fce5ee;
+  --accent-foreground: #5c1535;
+  --input: #d7a2b9;
+  --card: #ffffff;
+  --card-foreground: #25171e;
+  --popover: #ffffff;
+  --popover-foreground: #25171e;
+  --sidebar: #27131e;
+  --sidebar-foreground: #fff7fb;
+  --sidebar-primary: #f9c4d8;
+  --sidebar-primary-foreground: #27131e;
+  --sidebar-accent: #4b2035;
+  --sidebar-accent-foreground: #fff7fb;
+  --sidebar-border: #6e3a52;
+  --sidebar-ring: #ed6ba0;
+  --chart-1: #a61d55;
+  --chart-2: #e9508e;
+  --chart-3: #f6a5c3;
+  --chart-4: #27131e;
+  --chart-5: #8c5871;
 }

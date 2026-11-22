@@ -1171,6 +1171,439 @@ try {
       assert.match(results.find((r) => !r.ok).error.message, /category_stale/);
     },
   );
+  await check(
+    "handover takes a deposit and status-only guarantee; return requires the full ledger",
+    async () => {
+      const c = (await client.query("select id from public.categories limit 1"))
+        .rows[0].id;
+      const d = (
+        await asUser(
+          admin,
+          "insert into public.dresses(code,name,color,size,category_id) values('FLOW-TEST','Workflow test','Test','M',$1) returning id",
+          [c],
+        )
+      ).rows[0].id;
+      const b = (
+        await client.query(
+          "insert into public.bookings(request_id,dress_id,customer_id,starts_on,returns_on,agreed_price_piasters,created_by,assigned_to,created_at) select gen_random_uuid(),$1,id,(now() at time zone 'Africa/Cairo')::date,(now() at time zone 'Africa/Cairo')::date+1,100000,$2,$2,now()-interval '5 days' from public.customers limit 1 returning id",
+          [d, employee],
+        )
+      ).rows[0].id;
+      const old = (
+        await client.query(
+          "insert into public.bookings(request_id,dress_id,customer_id,starts_on,returns_on,agreed_price_piasters,status,created_by,assigned_to) select gen_random_uuid(),$1,id,(now() at time zone 'Africa/Cairo')::date-4,(now() at time zone 'Africa/Cairo')::date-3,10000,'out',$2,$2 from public.customers limit 1 returning id",
+          [d, admin],
+        )
+      ).rows[0].id;
+      await client.query(
+        "insert into public.payments(request_id,booking_id,amount_piasters,kind,recorded_by) values(gen_random_uuid(),$1,10000,'deposit',$2)",
+        [old, admin],
+      );
+      const req = "99999999-9999-4999-8999-999999999999";
+      await deny(
+        employee,
+        "select public.record_handover($1,$2,true,true)",
+        [req, b],
+        /policy_decisions_pending/,
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=true where id=true",
+      );
+      await deny(
+        other,
+        "select public.record_handover($1,$2,true,true)",
+        [req, b],
+        /not_authorized/,
+      );
+      await deny(
+        employee,
+        "select public.record_handover($1,$2,false,true)",
+        [req, b],
+        /handover_confirmation_required/,
+      );
+      await deny(
+        employee,
+        "select public.record_handover($1,$2,true,false)",
+        [req, b],
+        /handover_confirmation_required/,
+      );
+      await deny(
+        employee,
+        "select public.record_handover($1,$2,true,true)",
+        [req, b],
+        /deposit_required/,
+      );
+      await asUser(
+        employee,
+        "select public.record_payment(gen_random_uuid(),$1,20000,null)",
+        [b],
+      );
+      const handover = (
+        await asUser(
+          employee,
+          "select public.record_handover($1,$2,true,true) id",
+          [req, b],
+        )
+      ).rows[0].id;
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select public.record_handover($1,$2,true,true) id",
+            [req, b],
+          )
+        ).rows[0].id,
+        handover,
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select status from public.bookings where id=$1",
+            [b],
+          )
+        ).rows[0].status,
+        "out",
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select count(*)::int n from public.bookings where dress_id=$1 and status='out'",
+            [d],
+          )
+        ).rows[0].n,
+        2,
+      );
+      await deny(
+        employee,
+        "select public.record_handover(gen_random_uuid(),$1,true,true)",
+        [b],
+        /booking_not_confirmed/,
+      );
+      await deny(
+        employee,
+        "insert into public.handover_records(request_id,booking_id,card_received,ready_confirmed,recorded_by) values(gen_random_uuid(),$1,true,true,$2)",
+        [b, employee],
+        /permission denied/,
+      );
+      await deny(
+        other,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [b],
+        /not_authorized/,
+      );
+      await deny(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,false,'sound','{}')",
+        [b],
+        /return_confirmation_required/,
+      );
+      await deny(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'maintenance','{}')",
+        [b],
+        /invalid_inspection/,
+      );
+      await deny(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound',array['tear'])",
+        [b],
+        /invalid_inspection/,
+      );
+      await deny(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'maintenance',array['unknown'])",
+        [b],
+        /invalid_inspection/,
+      );
+      await deny(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [b],
+        /outstanding_balance_before_return/,
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select status from public.bookings where id=$1",
+            [b],
+          )
+        ).rows[0].status,
+        "out",
+      );
+      const returnReq = "99999999-1111-4111-8111-999999999999";
+      const race = await parallelAsUser(
+        "select case $1::text when 'return' then public.record_return($2,$3,true,'sound','{}') else public.add_late_fee($2,$3,100,'Concurrent optional fee') end id",
+        [
+          ["return", returnReq, old],
+          ["fee", "99999999-2222-4222-8222-999999999999", old],
+        ],
+        admin,
+      );
+      assert.equal(race.filter((r) => r.ok).length, 1);
+      if (!race[0].ok) {
+        assert.match(
+          race[0].error.message,
+          /outstanding_balance_before_return/,
+        );
+        await asUser(
+          admin,
+          "select public.record_payment(gen_random_uuid(),$1,100,null)",
+          [old],
+        );
+      } else
+        assert.match(race[1].error.message, /booking_not_currently_overdue/);
+      await asUser(
+        admin,
+        "select public.record_return($1,$2,true,'sound','{}')",
+        [returnReq, old],
+      );
+      const collision = (
+        await asUser(
+          admin,
+          "select public.get_admin_notifications('collision') d",
+        )
+      ).rows[0].d.items.find((i) => i.booking_id === old);
+      assert.ok(collision?.actual_returned_on);
+      assert.equal(collision.related_booking_id, b);
+      await asUser(
+        admin,
+        "select public.mark_notification_read($1,'collision',$2)",
+        [old, collision.event_on],
+      );
+      assert.ok(
+        (
+          await asUser(
+            admin,
+            "select public.get_admin_notifications('collision') d",
+          )
+        ).rows[0].d.items.find((i) => i.booking_id === old)?.read_at,
+      );
+      await client.query(
+        "update public.return_records set returned_on=returned_on-2 where booking_id=$1",
+        [old],
+      );
+      assert.equal(
+        (
+          await asUser(
+            admin,
+            "select public.get_admin_notifications('collision') d",
+          )
+        ).rows[0].d.items.some((i) => i.booking_id === old),
+        false,
+      );
+      await client.query(
+        "update public.return_records set returned_on=returned_on+2 where booking_id=$1",
+        [old],
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select status from public.dress_operations where dress_id=$1",
+            [d],
+          )
+        ).rows[0].status,
+        "outside",
+      );
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select * from public.return_records where booking_id=$1",
+            [old],
+          )
+        ).rowCount,
+        0,
+      );
+      await asUser(
+        employee,
+        "select public.record_payment(gen_random_uuid(),$1,80000,null)",
+        [b],
+      );
+      const req2 = "99999999-3333-4333-8333-999999999999";
+      const returned = (
+        await asUser(
+          employee,
+          "select public.record_return($1,$2,true,'maintenance',array['zipper','accessories','zipper']) id",
+          [req2, b],
+        )
+      ).rows[0].id;
+      assert.equal(
+        (
+          await asUser(
+            employee,
+            "select public.record_return($1,$2,true,'maintenance',array['accessories','zipper']) id",
+            [req2, b],
+          )
+        ).rows[0].id,
+        returned,
+      );
+      await deny(
+        employee,
+        "select public.record_return($1,$2,true,'sound','{}')",
+        [req2, b],
+        /request_id_payload_mismatch/,
+      );
+      assert.deepEqual(
+        (
+          await asUser(
+            employee,
+            "select inspection,issues,card_released from public.return_records where booking_id=$1",
+            [b],
+          )
+        ).rows[0],
+        {
+          inspection: "maintenance",
+          issues: ["accessories", "zipper"],
+          card_released: true,
+        },
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select status from public.dress_operations where dress_id=$1",
+            [d],
+          )
+        ).rows[0].status,
+        "maintenance",
+      );
+      await deny(
+        employee,
+        "update public.return_records set inspection='sound' where booking_id=$1",
+        [b],
+        /permission denied/,
+      );
+      await deny(
+        admin,
+        "update public.dress_operations set status='in_atelier' where dress_id=$1",
+        [d],
+        /permission denied/,
+      );
+      await deny(
+        employee,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [d],
+        /preparation_day_not_finished/,
+      );
+      await deny(
+        other,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [d],
+        /not_authorized/,
+      );
+      await client.query(
+        "update public.return_records set returned_on=returned_on-2 where booking_id in ($1,$2)",
+        [b, old],
+      );
+      await asUser(
+        employee,
+        "select public.set_dress_operation($1,'in_atelier')",
+        [d],
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select status from public.dress_operations where dress_id=$1",
+            [d],
+          )
+        ).rows[0].status,
+        "in_atelier",
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.record_return(uuid,uuid,boolean,text,text[])','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=false where id=true",
+      );
+    },
+  );
+  await check(
+    "actual-return preparation constrains new bookings, not existing handover",
+    async () => {
+      await client.query(
+        "update public.settings set live_bookings_enabled=true where id=true",
+      );
+      const c = (await client.query("select id from public.categories limit 1"))
+        .rows[0].id;
+      const d = (
+        await asUser(
+          admin,
+          "insert into public.dresses(code,name,color,size,category_id) values('ACTUAL-PREP','Late return preparation','Test','M',$1) returning id",
+          [c],
+        )
+      ).rows[0].id;
+      const b = (
+        await client.query(
+          "insert into public.bookings(request_id,dress_id,customer_id,starts_on,returns_on,agreed_price_piasters,status,created_by,assigned_to) select gen_random_uuid(),$1,id,(now() at time zone 'Africa/Cairo')::date-3,(now() at time zone 'Africa/Cairo')::date-1,10000,'out',$2,$2 from public.customers limit 1 returning id",
+          [d, employee],
+        )
+      ).rows[0].id;
+      await client.query(
+        "insert into public.payments(request_id,booking_id,amount_piasters,kind,recorded_by) values(gen_random_uuid(),$1,10000,'deposit',$2)",
+        [b, employee],
+      );
+      await asUser(
+        employee,
+        "select public.record_return(gen_random_uuid(),$1,true,'sound','{}')",
+        [b],
+      );
+      await deny(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'Synthetic new customer','01000000000',(now() at time zone 'Africa/Cairo')::date+1,(now() at time zone 'Africa/Cairo')::date+1,10000,0,null)",
+        [d],
+        /actual_preparation_conflict/,
+      );
+      const next = (
+        await asUser(
+          employee,
+          "select public.next_available_day($1,(now() at time zone 'Africa/Cairo')::date+1,0)::text as ready_day",
+          [d],
+        )
+      ).rows[0].ready_day;
+      assert.equal(
+        next,
+        (
+          await client.query(
+            "select ((now() at time zone 'Africa/Cairo')::date+2)::text as ready_day",
+          )
+        ).rows[0].ready_day,
+      );
+      await asUser(
+        employee,
+        "select public.create_booking(gen_random_uuid(),$1,'Synthetic new customer','01000000000',(now() at time zone 'Africa/Cairo')::date+2,(now() at time zone 'Africa/Cairo')::date+2,10000,0,null)",
+        [d],
+      );
+      const state = (
+        await asUser(employee, "select public.get_booking_workflow($1) d", [b])
+      ).rows[0].d;
+      assert.equal(state.return.card_released, true);
+      assert.equal(state.operation, "preparation");
+      assert.equal(state.ready_on, next);
+      await deny(
+        other,
+        "select public.get_booking_workflow($1)",
+        [b],
+        /not_authorized/,
+      );
+      assert.equal(
+        (
+          await client.query(
+            "select has_function_privilege('anon','public.get_booking_workflow(uuid)','EXECUTE') allowed",
+          )
+        ).rows[0].allowed,
+        false,
+      );
+      await client.query(
+        "update public.settings set live_bookings_enabled=false where id=true",
+      );
+    },
+  );
   await check("deactivation removes staff access immediately", async () => {
     await client.query("update public.profiles set active=false where id=$1", [
       employee,

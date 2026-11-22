@@ -9,6 +9,7 @@ const schema = z.object({
   same_day_allowed: z.boolean().nullable(),
   payment_methods: z.array(z.string()),
   payment_method_optional: z.boolean().default(false),
+  handover_return_ready: z.boolean().default(false),
 });
 export type BookingConfig = z.infer<typeof schema>;
 export async function getBookingConfig(
@@ -28,4 +29,8 @@ export function bookingConfigReady(c: BookingConfig | null) {
     c.same_day_allowed === false &&
     c.payment_method_optional
   );
+}
+
+export function workflowReady(c: BookingConfig | null) {
+  return bookingConfigReady(c) && c?.handover_return_ready === true;
 }

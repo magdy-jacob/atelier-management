@@ -91,7 +91,7 @@ export function OperationsBoard({
           الشهر الحالي
         </Link>
       </div>
-      <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-7">
+      <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
         هذه قراءة للمواعيد والحالات المسجلة، لا تؤكد تسليمًا أو عودة فعلية. فترة
         التجهيز في التقويم محسوبة من موعد العودة المخطط. لا تُرسل إشعارات خارج
         الموقع، ولا تُحسب غرامة تلقائيًا. تغيرات اليوم تظهر عند إعادة تحميل
@@ -164,7 +164,7 @@ export function OperationsBoard({
         </div>
         <div className="mb-5 flex flex-wrap gap-3 text-[11px]">
           <span className="rounded bg-primary/10 px-3 py-2">حجز مخطط</span>
-          <span className="rounded border border-dashed border-amber-500 bg-amber-50 px-3 py-2">
+          <span className="rounded border border-dashed border-pink-500 bg-pink-50 px-3 py-2">
             يوم تجهيز مخطط
           </span>
           <span className="rounded bg-red-100 px-3 py-2">
@@ -221,7 +221,7 @@ export function OperationsBoard({
                               ? "#calendar"
                               : `/workspace/bookings/${b.id}`
                           }
-                          className={`block break-words rounded-md px-2 py-2 text-[10px] leading-5 ${b.preparation ? "border border-dashed border-amber-500 bg-amber-50" : b.status === "out" && b.returns_on < today ? "bg-red-100 text-red-900" : "bg-primary/10"}`}
+                          className={`block break-words rounded-md px-2 py-2 text-[10px] leading-5 ${b.preparation ? "border border-dashed border-pink-500 bg-pink-50" : b.status === "out" && b.returns_on < today ? "bg-red-100 text-red-900" : "bg-primary/10"}`}
                         >
                           {b.dressName}
                           {b.preparation && (

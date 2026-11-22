@@ -1,3 +1,4 @@
+import { aggregateMoney } from "@/lib/admin-dashboard";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/lib/domain";
@@ -154,22 +155,32 @@ export function BookingLedger({
   payments,
 }: {
   price: number;
-  fees: number;
+  fees: number | string;
   payments: LedgerRow[];
 }) {
-  const paid = payments.reduce((sum, p) => sum + Number(p.amount_piasters), 0);
+  const paid = payments.reduce(
+    (sum, p) => sum + BigInt(String(p.amount_piasters)),
+    BigInt(0),
+  );
+  const priceValue = BigInt(String(price)),
+    feesValue = BigInt(String(fees));
+  const totals: [string, bigint][] = [
+    ["قيمة الحجز", priceValue],
+    ["غرامات مسجلة", feesValue],
+    ["دفعات مسجلة", paid],
+    ["المتبقي", priceValue + feesValue - paid],
+  ];
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {[
-          ["قيمة الحجز", price],
-          ["غرامات مسجلة", fees],
-          ["دفعات مسجلة", paid],
-          ["المتبقي", price + fees - paid],
-        ].map(([label, amount]) => (
+        {totals.map(([label, amount]) => (
           <div key={label} className="studio-card p-5">
             <p className="mb-4 text-[11px] text-muted-foreground">{label}</p>
-            <p className="text-xl">{money(Number(amount))}</p>
+            <p className="text-xl">
+              {amount >= BigInt(0)
+                ? aggregateMoney(amount.toString())
+                : `-${aggregateMoney((-amount).toString())}`}
+            </p>
           </div>
         ))}
       </div>

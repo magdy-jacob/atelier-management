@@ -54,17 +54,9 @@ test("demo role separation, conflict rejection, accepted booking and calendar", 
   await page
     .getByRole("heading", { name: "كل تفاصيل يومك، في مكان واحد." })
     .waitFor();
-  await expect
-    .poll(async () => {
-      const logo = await page
-        .getByRole("link", { name: "Lovely، الصفحة الرئيسية", exact: true })
-        .boundingBox();
-      const banner = await page
-        .getByRole("note", { name: "نسخة اختبار فقط" })
-        .boundingBox();
-      return !!logo && !!banner && logo.y >= banner.y + banner.height;
-    })
-    .toBeTruthy();
+  await expect(page.getByRole("note", { name: "نسخة اختبار فقط" })).toHaveCount(
+    0,
+  );
   await page.screenshot({
     path: "evidence/dashboard-desktop.png",
     fullPage: true,
@@ -128,9 +120,7 @@ test("no-configuration login and workspace fail closed", async ({ page }) => {
     page.getByRole("button", { name: "تسجيل الدخول", exact: true }),
   ).toBeDisabled();
   await page.goto("/workspace");
-  await expect(
-    page.getByRole("heading", { name: "مساحة العمل غير مهيأة بعد" }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/login/);
 });
 
 test("inventory editor preview is clear, responsive and cannot mutate", async ({
@@ -149,7 +139,7 @@ test("inventory editor preview is clear, responsive and cannot mutate", async ({
   ).toBeDisabled();
   await expect(
     page.getByRole("link", {
-      name: "فتح بيانات مساحة العمل، بدخول الفريق",
+      name: "دخول مساحة العمل",
       exact: true,
     }),
   ).toHaveAttribute("href", "/workspace");
@@ -311,9 +301,9 @@ test("admin summary has explicit money definitions and remains protected", async
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/demo/admin");
-  await expect(
-    page.getByRole("note", { name: "نسخة اختبار فقط" }),
-  ).toBeVisible();
+  await expect(page.getByRole("note", { name: "نسخة اختبار فقط" })).toHaveCount(
+    0,
+  );
   await expect(
     page.getByRole("heading", { name: "لوحة الأدمن" }),
   ).toBeVisible();
@@ -398,15 +388,7 @@ test("overdue fee is optional, explicit and disabled in prototype preview", asyn
   ).toBeDisabled();
   await expect(page.getByText(/ولا يخصم أموالًا/)).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
-  await expect
-    .poll(async () =>
-      Math.round(
-        (await page
-          .getByRole("note", { name: "نسخة اختبار فقط" })
-          .boundingBox())!.y,
-      ),
-    )
-    .toBe(0);
+  await expect(page.locator("header")).toBeVisible();
   await page.screenshot({
     path: "evidence/late-fee-desktop.png",
     fullPage: true,
@@ -421,15 +403,7 @@ test("overdue fee is optional, explicit and disabled in prototype preview", asyn
   await page.getByLabel("سبب الغرامة").fill("سبب تجريبي اختياري");
   await page.getByRole("checkbox").check();
   await page.evaluate(() => window.scrollTo(0, 0));
-  await expect
-    .poll(async () =>
-      Math.round(
-        (await page
-          .getByRole("note", { name: "نسخة اختبار فقط" })
-          .boundingBox())!.y,
-      ),
-    )
-    .toBe(0);
+  await expect(page.locator("header")).toBeVisible();
   await page.screenshot({
     path: "evidence/late-fee-mobile.png",
     fullPage: true,
@@ -895,40 +869,41 @@ test("team preview protects admin role, labels synthetic creation and preserves 
     page.getByRole("button", { name: "تحقق وأكمل الربط فقط" }),
   ).toBeDisabled();
   await page
-    .getByLabel("معرف البريد التجريبي", { exact: true })
+    .getByLabel("معرف البريد", { exact: true })
     .fill("test-browser@example.invalid");
   expect(
     await page
-      .getByLabel("معرف البريد التجريبي", { exact: true })
+      .getByLabel("معرف البريد", { exact: true })
       .evaluate((e: HTMLInputElement) => e.checkValidity()),
   ).toBeTruthy();
   await page
-    .getByLabel("معرف البريد التجريبي", { exact: true })
+    .getByLabel("معرف البريد", { exact: true })
     .fill("real@example.com");
   expect(
     await page
-      .getByLabel("معرف البريد التجريبي", { exact: true })
+      .getByLabel("معرف البريد", { exact: true })
       .evaluate((e: HTMLInputElement) => e.checkValidity()),
   ).toBeFalsy();
   await page
-    .getByLabel("معرف البريد التجريبي", { exact: true })
+    .getByLabel("معرف البريد", { exact: true })
     .fill("test-browser@example.invalid");
   await page
-    .getByLabel("اسم تجريبي", { exact: true })
+    .getByLabel("اسم الموظف", { exact: true })
+    .first()
     .fill("اختبار اسم يحتفظ به النموذج");
   await page
-    .getByLabel("كلمة مرور للحساب التجريبي", { exact: false })
+    .getByLabel("كلمة مرور الحساب", { exact: false })
     .fill("fixture-not-a-real-secret");
   await page
     .locator('input[name="email"]')
     .evaluate((e: HTMLInputElement) => e.form!.reset());
-  await expect(page.getByLabel("اسم تجريبي", { exact: true })).toHaveValue(
-    "اختبار اسم يحتفظ به النموذج",
-  );
   await expect(
-    page.getByLabel("معرف البريد التجريبي", { exact: true }),
-  ).toHaveValue("test-browser@example.invalid");
-  await page.getByLabel("كلمة مرور للحساب التجريبي", { exact: false }).fill("");
+    page.getByLabel("اسم الموظف", { exact: true }).first(),
+  ).toHaveValue("اختبار اسم يحتفظ به النموذج");
+  await expect(page.getByLabel("معرف البريد", { exact: true })).toHaveValue(
+    "test-browser@example.invalid",
+  );
+  await page.getByLabel("كلمة مرور الحساب", { exact: false }).fill("");
   await page.screenshot({ path: "evidence/team-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "evidence/team-mobile.png", fullPage: true });
@@ -1163,4 +1138,87 @@ test("admin manual catalogue counts are explicit and separate from financial per
     path: "evidence/admin-public-counts-mobile.png",
     fullPage: true,
   });
+});
+
+test("persisted workspace shared design has image inventory, real-route links, mobile drawer and role boundaries", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/demo/studio");
+  await expect(
+    page.getByRole("heading", { name: "كل تفاصيل يومك، في مكان واحد." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "مساحة العمل" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "المالية والمؤشرات", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "مجموعة الفساتين" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /همسة زيتون.*تفاصيل الفستان/ }),
+  ).toHaveAttribute("href", "/workspace/dresses/sage");
+  for (const image of await page.locator("#inventory img").all())
+    await expect
+      .poll(() =>
+        image.evaluate(
+          (el: HTMLImageElement) => el.complete && el.naturalWidth > 0,
+        ),
+      )
+      .toBeTruthy();
+  await page.screenshot({
+    path: "evidence/workspace-studio-desktop.png",
+    fullPage: true,
+  });
+  await page.getByLabel("بحث المخزون بالاسم أو الكود").fill("AT-001");
+  await expect(page.locator("#inventory .dress-card")).toHaveCount(1);
+  await page.getByLabel("بحث المخزون بالاسم أو الكود").fill("");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect(
+    page.getByRole("navigation", { name: "مساحة العمل" }),
+  ).not.toBeVisible();
+  await page.getByRole("button", { name: "فتح القائمة", exact: true }).click();
+  await expect(
+    page.getByRole("navigation", { name: "مساحة العمل" }),
+  ).toBeVisible();
+  await page.screenshot({ path: "evidence/workspace-studio-mobile-menu.png" });
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "فتح القائمة", exact: true }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("navigation", { name: "مساحة العمل" }),
+  ).not.toBeVisible();
+  await page.screenshot({
+    path: "evidence/workspace-studio-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.goto("/demo/studio?role=employee");
+  await page.getByRole("button", { name: "فتح القائمة", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: "المالية والمؤشرات", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "الفريق والصلاحيات", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("link", { name: "إضافة فستان", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("/login");
+  await expect(
+    page.getByRole("link", { name: /استعراض النظام|استعراض الواجهة/ }),
+  ).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("مشروع معرض أعمال");
+  expect(errors).toEqual([]);
 });

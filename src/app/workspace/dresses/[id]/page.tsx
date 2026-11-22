@@ -3,7 +3,7 @@ import { Unavailable } from "@/components/atelier/staff-frame";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Header } from "@/components/atelier/chrome";
+import { StaffFrame } from "@/components/atelier/staff-frame";
 import { InventoryEditor } from "@/components/atelier/inventory-editor";
 import { requireStaff } from "@/lib/supabase/auth";
 import { configured } from "@/lib/supabase/server";
@@ -82,47 +82,48 @@ export default async function ManageDress({
       .publicUrl,
   }));
   return (
-    <>
-      <Header />
-      <main className="mx-auto max-w-6xl px-5 py-9">
-        <Link
-          href="/workspace"
-          className="mb-6 inline-block text-xs text-muted-foreground"
-        >
-          ← العودة لمساحة العمل
-        </Link>
-        <h1 className="mb-3 text-2xl">{dress.name}</h1>
-        <p className="mb-8 text-xs leading-7 text-muted-foreground">
-          {profile.role === "admin"
-            ? "إدارة البيانات والصور والأرشفة. السعر الإداري وعمليات الحجز تبقى منفصلة."
-            : "بيانات الفستان. التعديل ورفع الصور للأدمن فقط."}
-        </p>
-        <InventoryEditor
-          key={dress.id}
-          dress={dress}
-          categories={categories ?? []}
-          images={images}
-          readOnly={profile.role !== "admin"}
-          cleanupJobs={cleanup?.data ?? []}
-        />
-        {history &&
-          (historyError ? (
-            <Unavailable />
-          ) : (
-            <DressHistory
-              admin
-              bookings={(history[0].data ?? []).map((b) => ({
-                ...b,
-                agreed_price_piasters: Number(b.agreed_price_piasters),
-                dressName: dress.name,
-              }))}
-              logs={history[1].data ?? []}
-              names={Object.fromEntries(
-                (history[2].data ?? []).map((p) => [p.id, p.full_name]),
-              )}
-            />
-          ))}
-      </main>
-    </>
+    <StaffFrame
+      title={dress.name}
+      name={profile.full_name}
+      role={profile.role}
+      active="/workspace?view=dresses"
+    >
+      <Link
+        href="/workspace"
+        className="mb-6 inline-block text-xs text-muted-foreground"
+      >
+        ← العودة لمساحة العمل
+      </Link>
+      <p className="mb-8 text-xs leading-7 text-muted-foreground">
+        {profile.role === "admin"
+          ? "إدارة البيانات والصور والأرشفة. السعر الإداري وعمليات الحجز تبقى منفصلة."
+          : "بيانات الفستان. التعديل ورفع الصور للأدمن فقط."}
+      </p>
+      <InventoryEditor
+        key={dress.id}
+        dress={dress}
+        categories={categories ?? []}
+        images={images}
+        readOnly={profile.role !== "admin"}
+        cleanupJobs={cleanup?.data ?? []}
+      />
+      {history &&
+        (historyError ? (
+          <Unavailable />
+        ) : (
+          <DressHistory
+            admin
+            bookings={(history[0].data ?? []).map((b) => ({
+              ...b,
+              agreed_price_piasters: Number(b.agreed_price_piasters),
+              dressName: dress.name,
+            }))}
+            logs={history[1].data ?? []}
+            names={Object.fromEntries(
+              (history[2].data ?? []).map((p) => [p.id, p.full_name]),
+            )}
+          />
+        ))}
+    </StaffFrame>
   );
 }

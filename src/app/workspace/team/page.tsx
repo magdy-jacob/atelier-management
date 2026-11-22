@@ -44,7 +44,7 @@ export default async function Team() {
   return (
     <StaffFrame
       title="الفريق والصلاحيات"
-      description="إنشاء موظفين تجريبيين وإدارة أسمائهم وحالتهم للأدمن. لا دعوات بريدية، لا حذف للتاريخ ولا تغيير للأدوار."
+      description="إدارة حسابات الفريق وأسمائهم وحالتهم. التعطيل يحافظ على السجلات، ولا يغير أدوار الحسابات."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/team"

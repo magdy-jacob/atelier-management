@@ -1,38 +1,28 @@
-# Verification record, 0.21.0
+# Verification record, 0.22.0
 
-Checked locally on 22 November 2026. This source checkpoint is not a claim that hosted acceptance or the complete MVP has finished. Historical sections below record earlier versions and are superseded by this current section.
+Checked locally on22 November2026. Source-only checkpoint. Hosted role, query and image acceptance is separate. Historical sections below are earlier records, not current banner/layout descriptions.
 
 ## Current passed checks
 
-- ESLint and TypeScript: pass.
-- 48 unit tests: pass.
-- 253 checks against an actual temporary local PostgreSQL instance: pass. Auth/Storage schemas are local substitutes, not vendor services.
-- Optimized Next.js builds with functional portfolio flag off and on: pass.
-- 26 Chrome browser scenarios in each optimized functional/default-flag build: pass.
-- npm audit with production dependencies: zero reported vulnerabilities at this checkpoint. An audit is not a security guarantee.
-
-## Functional synthetic mode coverage
-
-- Mode-off baseline remains closed. Application flags must agree with database configuration.
-- Invalid real-looking new customer names/phone values reject; matching test identifiers pass server and native browser validation.
-- Private registry tables cannot be edited by application roles. Unregistered records reject operational/financial changes in synthetic mode.
-- Ordinary same-day booking and pre-window handover still reject. A returned dress cannot be marked ready before its full preparation day.
-- Admin-only current-day scenario setup rejects an inactive assignee or invalid case, preserves original review-booking fingerprints, and exact retry returns one booking. Changed replay payload rejects.
-- Assigned employee can complete deposit handover, remaining receipt and balance-gated return. Since20, unrelated active staff can view every booking and record its initial deposit/return balance, but cannot perform handover/return/readiness. A fully paid return case accepts multi-select maintenance. An overdue case appears in actual SQL notifications and accepts an optional admin fee, exact balance receipt and return.
-- These scenarios fabricate their labelled setup history explicitly. They do not weaken the normal booking RPC's advance rule or reset original review records.
-- An uncertain image-metadata response can recover a committed link. Unverified attachment retains the object rather than deleting a possibly linked image. This port-helper behavior is covered by unit tests; live transport-failure injection is not claimed.
+- ESLint and TypeScript pass.
+  -52 unit tests pass, including exact large piasters, fee/receipt balance mapping, cancellation/overpayment handling and deterministic image order without mutation.
+  -253 checks against a temporary local PostgreSQL18 instance pass, with local substitutes for Auth/Storage.
+- Optimized Next.js builds with functional portfolio flag on and off pass.
+  -27 Chrome scenarios pass in each optimized build. No configuration still fails closed at login. Synthetic controls remain disabled in previews and validation stays enforced.
+- Full local backup/restore verification passes for21, plus historical20 restore and then21 upgrade.24 table content hashes,39 functions,26 policies and38 triggers match. This does not prove a real second-cloud Auth/Storage restore.
+- npm production audit reports zero vulnerabilities at this checkpoint, not a security guarantee.
 
 ## Pixels inspected
 
-Actual rendered screenshots of the new scenario form on desktop/mobile and the synthetic booking form on mobile were inspected for RTL readability, labels, notice separation, spacing, logo/banner placement and overflow. Native TEST- contact validation was exercised in Chrome. The scenario preview remains clearly non-saving and its submit button disabled; the real protected page uses the same form with configuration-based enablement.
+Final shared workspace desktop,390px mobile overview and mobile drawer screenshots were opened and inspected. Checked dark sidebar/logo placement, topbar, rose card hierarchy, readable mobile booking rows, image inventory, count labels, compact mobile stats and overflow. The final Chrome suite refreshes all older page evidence with the new shell. Drawer Escape restores focus; background is inert while open. Admin-only navigation is absent for employee fixtures. Booking edit fields remain disabled until their handlers are hydrated; values and confirmation survive native reset.
 
-Evidence: `evidence/portfolio-scenarios-desktop.png`, `portfolio-scenarios-mobile.png`, `portfolio-booking-mobile.png`. Existing catalogue/inventory/workflow/notification/report screenshots were refreshed by the suite. Tested viewport widths: 1440 and 390. No document-level mobile overflow in the automated scenarios.
+Evidence: `evidence/workspace-studio-desktop.png`, `workspace-studio-mobile.png`, `workspace-studio-mobile-menu.png`. These screenshots use the same components as persisted /workspace with explicit illustrative fixtures on /demo/studio. They prove shared component layout, not authenticated hosted reads or actions. Earlier screenshots may be historical and must not be presented as live22 acceptance.
 
-## Remaining verification and implementation
+## Unchanged boundaries and pending hosted acceptance
 
-Hosted authenticated creation/payment/handover/return/scenario feedback, actual employee sessions, vendor RLS/Storage and current deployment configuration are a separate acceptance step. No live setting or audience was changed by this local work. Do not present disabled preview clicks as hosted acceptance.
+No migration22. No live SQL, data, account, environment, audience, hosting, Storage or permission change was performed by this source work. Original review rows and images remain untouched. Internal prototype/noindex/configuration guards and synthetic input restrictions remain. Public catalogue labels are manual, not date-specific availability guarantees. The old global project/test notice and public preview promotion are intentionally removed; direct non-saving previews remain explicit.
 
-Employee account management and booking editing/availability are implemented and locally tested. Parent reports hosted Auth acceptance for18; newer hosted acceptance and historical financial exceptions, backup/restore and full integrated acceptance remain separate. No actual payout or refund exists. The previous review dataset and original image objects must stay intact. See `DECISIONS.md` for settled and open policy boundaries.
+See `UI-v22-ACCEPTANCE.md`: actual admin/employee sessions must validate the nested PostgREST image/customer/payment/fee reads, count heads, attention filter, links, real forms and preserved role boundaries. Combine that with any outstanding21 employee daily-queue acceptance. Local previews cannot substitute for persisted action confirmation. No full-project or cloud-recovery completion is claimed.
 
 ## Historical local checkpoints
 

@@ -46,7 +46,7 @@ export default async function Home() {
           <div className="relative min-h-[350px] overflow-hidden rounded-t-[150px] bg-[#fce5ee] sm:min-h-[450px] md:min-h-[520px]">
             <Image
               src="/dresses/sage-demo.webp"
-              alt="صورة مولدة لفستان سهرة أخضر للتجربة، ليست من مخزون حقيقي"
+              alt="صورة توضيحية لفستان سهرة أخضر"
               fill
               className="object-cover object-center"
               priority
@@ -57,7 +57,7 @@ export default async function Home() {
               <div>
                 <p className="mb-1 text-sm">جمالك في تفاصيلك</p>
                 <p className="text-[10px] text-muted-foreground">
-                  صورة مولدة للتجربة، ليست مخزونًا حقيقيًا
+                  من مجموعة الصور التوضيحية
                 </p>
               </div>
             </div>

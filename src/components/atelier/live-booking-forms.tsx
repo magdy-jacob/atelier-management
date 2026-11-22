@@ -64,13 +64,6 @@ export function LiveBookingForm({
       className="studio-card space-y-6 p-6 md:p-8"
     >
       <input name="request_id" type="hidden" value={requestId} />
-      {synthetic && (
-        <p className="rounded-xl border bg-secondary p-4 text-xs leading-7">
-          اختبار وظيفي لمشروع معرض أعمال. تُحفظ السجلات المصطنعة في Supabase
-          وتعمل القواعد فعليًا، دون تحصيل أو التزام مالي أو عملاء حقيقيين. الهاتف
-          معرف اختبار يبدأ بـTEST- ولا يمكن الاتصال به.
-        </p>
-      )}
       {!enabled && (
         <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
           الحفظ الفعلي غير مفعل بعد. الحجز بالأيام بتوقيت مصر، وقبل الخروج بيوم
@@ -104,7 +97,7 @@ export function LiveBookingForm({
           />
           {synthetic && (
             <span className="text-[10px] leading-6">
-              اسم شخصية مصطنعة يبدأ بكلمة اختبار، لا اسم عميل حقيقي.
+              صيغة الاسم لهذا الحساب تبدأ بكلمة «اختبار».
             </span>
           )}
         </label>

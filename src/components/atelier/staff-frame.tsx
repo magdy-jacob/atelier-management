@@ -1,16 +1,5 @@
-import Link from "next/link";
-import { Header, DemoNotice } from "./chrome";
-import { signOut } from "@/app/actions";
-import { Button } from "@/components/ui/button";
-export function StaffFrame({
-  title,
-  description,
-  name,
-  role,
-  active,
-  preview = false,
-  children,
-}: {
+import { WorkspaceShell } from "./workspace-shell";
+export function StaffFrame(props: {
   title: string;
   description?: string;
   name: string;
@@ -19,77 +8,7 @@ export function StaffFrame({
   preview?: boolean;
   children: React.ReactNode;
 }) {
-  const links = [
-    ["/workspace", "نظرة عامة"],
-    ["/workspace/bookings", "الحجوزات"],
-    ["/workspace/operations", "العمليات والتقويم"],
-    ...(role === "admin"
-      ? [
-          ["/workspace/dashboard", "لوحة الأدمن"],
-          ["/workspace/reports", "تقارير القبض والتصدير"],
-          ["/workspace/notifications", "مركز الإشعارات"],
-          ["/workspace/customers", "العملاء"],
-          ["/workspace/activity", "سجل النشاط"],
-          ["/workspace/team", "الفريق"],
-          ["/workspace/portfolio", "تجربة المشروع"],
-          ["/workspace/categories", "التصنيفات"],
-        ]
-      : []),
-  ];
-  return (
-    <>
-      <Header />
-      {preview && <DemoNotice short />}
-      <main className="mx-auto max-w-6xl space-y-7 px-5 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">
-            {name} · {role === "admin" ? "أدمن" : "موظف"}
-            {preview ? " · معاينة فقط" : ""}
-          </p>
-          {!preview && (
-            <form action={signOut}>
-              <Button variant="outline" size="sm" type="submit">
-                تسجيل الخروج
-              </Button>
-            </form>
-          )}
-        </div>
-        <nav
-          className="flex flex-wrap gap-2 border-b pb-5"
-          aria-label="مساحة العمل"
-        >
-          {links.map(([href, label]) => (
-            <Link
-              key={href}
-              href={
-                preview
-                  ? href === "/workspace/portfolio"
-                    ? "/demo/portfolio"
-                    : href === "/workspace/reports"
-                      ? "/demo/reports"
-                      : href === "/workspace/categories"
-                        ? "/demo/categories"
-                        : "/demo"
-                  : href
-              }
-              className={`rounded-full border px-4 py-2 text-xs ${active === href ? "border-primary bg-primary text-white" : "bg-white text-muted-foreground"}`}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-        <div>
-          <h1 className="mb-3 text-2xl">{title}</h1>
-          {description && (
-            <p className="max-w-3xl text-xs leading-7 text-muted-foreground">
-              {description}
-            </p>
-          )}
-        </div>
-        {children}
-      </main>
-    </>
-  );
+  return <WorkspaceShell {...props} />;
 }
 export function Unavailable() {
   return (

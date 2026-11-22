@@ -95,7 +95,7 @@ async function runJob(
   return {
     success: result.recovered
       ? "الحساب الموجود لنفس الطلب تحقق وربط بنجاح. كلمة مروره الأصلية لم تتغير، ولم تُرسل دعوة بريدية."
-      : "أُنشئ موظف تجريبي نشط وربط بصلاحية موظف فقط. لم تُرسل رسالة أو دعوة، ولم تُعرض كلمة المرور.",
+      : "أُنشئ حساب موظف نشط وربط بصلاحية موظف فقط. لم تُرسل رسالة أو دعوة، ولم تُعرض كلمة المرور.",
   };
 }
 export async function createEmployeeAccount(
@@ -131,7 +131,7 @@ export async function createEmployeeAccount(
   if (!p.success)
     return {
       error:
-        "راجع الاسم المصطنع ومعرف البريد test-...@example.invalid، وكلمة مرور12حرفًا على الأقل وبحد72بايت، ثم أكد الإنشاء دون إرسال بريد.",
+        "راجع صيغة الاسم ومعرف البريد test-...@example.invalid، وكلمة مرور12حرفًا على الأقل وبحد72بايت، ثم أكد الإنشاء دون إرسال بريد.",
     };
   const { data, error } = await c.db.rpc("begin_employee_account", {
     p_request_id: p.data.request_id,

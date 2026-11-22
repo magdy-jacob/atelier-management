@@ -2,22 +2,25 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { requireStaff } from "@/lib/supabase/auth";
 import { StaffFrame, Unavailable } from "@/components/atelier/staff-frame";
-import { BookingList } from "@/components/atelier/records";
+import { WorkspaceBookingTable } from "@/components/atelier/workspace-overview";
+import {
+  bookingForWorkspace,
+  workspaceBookingColumns,
+} from "@/lib/workspace-view";
 export default async function Bookings() {
   const { db, profile } = await requireStaff();
   const { data, error } = await db
     .from("bookings")
-    .select(
-      "id,starts_on,returns_on,status,agreed_price_piasters,dresses(name)",
-    )
+    .select(workspaceBookingColumns)
     .order("starts_on", { ascending: false })
     .limit(100);
-  const bookings = (data ?? []).map((b) => ({
-    ...b,
-    dressName:
-      (Array.isArray(b.dresses) ? b.dresses[0] : b.dresses)?.name ??
-      "فستان غير متاح",
-  }));
+  const bookings = (data ?? []).map((b) =>
+    bookingForWorkspace(
+      b,
+      (path) =>
+        db.storage.from("dress-images").getPublicUrl(path).data.publicUrl,
+    ),
+  );
   return (
     <StaffFrame
       title="الحجوزات"
@@ -32,7 +35,13 @@ export default async function Bookings() {
       >
         إنشاء حجز
       </Link>
-      {error ? <Unavailable /> : <BookingList bookings={bookings} />}
+      {error ? (
+        <Unavailable />
+      ) : (
+        <section className="studio-card overflow-hidden">
+          <WorkspaceBookingTable bookings={bookings} />
+        </section>
+      )}
     </StaffFrame>
   );
 }

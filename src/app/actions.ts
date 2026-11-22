@@ -23,7 +23,7 @@ export async function signIn(
 ): Promise<ActionState> {
   if (!configured())
     return {
-      error: "لم يتم ربط Supabase بعد. استخدم استعراض النظام لتجربة الواجهة.",
+      error: "خدمة تسجيل الدخول غير مهيأة حاليًا. راجع إعدادات الاتصال.",
     };
   const parsed = z
     .object({ email: z.email(), password: z.string().min(1).max(256) })
@@ -295,7 +295,7 @@ export async function createRealBooking(
     config?.synthetic_test_enabled &&
     !validSyntheticName(parsed.data.customer)
   )
-    return { error: "استخدم اسمًا مصطنعًا يبدأ بكلمة اختبار." };
+    return { error: "صيغة الاسم لهذا الحساب يجب أن تبدأ بكلمة اختبار." };
   const { validDay, toPiasters, formatDay } = await import("@/lib/domain");
   if (
     !validDay(parsed.data.starts_on) ||

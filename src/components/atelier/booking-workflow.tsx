@@ -357,8 +357,8 @@ export function BookingWorkflow({
       )}
       {!enabled && (
         <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
-          الحفظ غير متاح في المعاينة أو قبل اكتمال إعداد الاختبار الوظيفي.
-          الحقول للمراجعة فقط.
+          الحفظ غير متاح في هذه الصفحة أو قبل اكتمال إعداد الخدمة. الحقول
+          للمراجعة فقط.
         </p>
       )}
       {success && (

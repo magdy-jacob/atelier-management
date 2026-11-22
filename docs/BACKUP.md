@@ -1,4 +1,4 @@
-# Manual backup and isolated restore, source v0.21.0
+# Manual backup and isolated restore, source v0.22.0, schema20/21 unchanged
 
 النسخة هنا يدوية على الخطة المجانية، وليست نسخًا سحابية تلقائية. ثبت محليًا أخذ نسخة واستعادتها إلى PostgreSQL معزول. لا توجد مطالبة بأن استعادة مشروع Supabase ثانٍ بالكامل جُرّبت سحابيًا. لا تُنفّذ الاستعادة على المشروع الأصلي.
 

@@ -25,10 +25,10 @@ export default function Login() {
           )}
           <LoginForm ready={ready} />
           <Link
-            href="/demo"
+            href="/"
             className="mt-6 block text-center text-xs text-primary underline underline-offset-4"
           >
-            استعراض الواجهة ببيانات تجريبية
+            العودة إلى مجموعة الفساتين
           </Link>
         </div>
       </main>

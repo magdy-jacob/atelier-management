@@ -40,12 +40,6 @@ export function Header() {
             مجموعة الفساتين
           </Link>
           <Link
-            className="text-muted-foreground hover:text-primary"
-            href="/demo"
-          >
-            استعراض النظام
-          </Link>
-          <Link
             href="/login"
             className="flex items-center gap-2 border-b border-primary/40 pb-1"
           >
@@ -61,13 +55,13 @@ export function DemoNotice({ short = false }: { short?: boolean }) {
   return (
     <div className="border-b border-pink-200 bg-pink-50 px-4 py-2 text-center text-[11px] leading-6 text-pink-950">
       {short
-        ? "بيئة عرض فقط • كل الأسماء والأرقام والعمليات تجريبية"
-        : "نسخة أولية للعرض • بيانات وصور مولدة للتجربة وليست مخزونًا أو حجوزات حقيقية"}
+        ? "معاينة غير متصلة. لا تُحفظ التغييرات هنا."
+        : "مجموعة صور توضيحية، وليست تأكيدًا لتوفر فستان أو موعد."}
       <Link
         href="/workspace"
         className="mx-3 inline-block font-medium underline underline-offset-4"
       >
-        فتح بيانات مساحة العمل، بدخول الفريق
+        دخول مساحة العمل
       </Link>
     </div>
   );

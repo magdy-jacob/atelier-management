@@ -155,12 +155,12 @@ function NewEmployee({
   return (
     <section className="studio-card space-y-5 p-6 md:p-8">
       <h2 className="text-lg">
-        {job ? "استكمال طلب محفوظ" : "إنشاء موظف تجريبي"}
+        {job ? "استكمال طلب محفوظ" : "إنشاء حساب موظف"}
       </h2>
       <p className="text-xs leading-8 text-muted-foreground">
-        حساب تسجيل دخول فعلي ببيانات مصطنعة وصلاحية موظف فقط، وليس دعوة بريدية.
-        الاسم يبدأ بكلمة اختبار. البريد معرف غير قابل للتواصل ضمن
-        example.invalid. لا تستخدم اسمًا أو بريدًا أو كلمة مرور تخص شخصًا حقيقيًا.
+        حساب تسجيل دخول بصلاحية موظف فقط. لا تُرسل دعوة بريدية. الاسم يبدأ بكلمة
+        اختبار. البريد معرف غير قابل للتواصل ضمن example.invalid. لا تستخدم اسمًا
+        أو بريدًا أو كلمة مرور تخص شخصًا حقيقيًا.
       </p>
       {!enabled && !preview && (
         <p className="rounded-xl bg-secondary p-4 text-xs leading-7">
@@ -182,7 +182,7 @@ function NewEmployee({
       >
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="field">
-            اسم تجريبي
+            اسم الموظف
             <input
               name="name"
               required
@@ -194,7 +194,7 @@ function NewEmployee({
             />
           </label>
           <label className="field">
-            معرف البريد التجريبي
+            معرف البريد
             <input
               dir="ltr"
               name="email"
@@ -209,7 +209,7 @@ function NewEmployee({
           </label>
         </div>
         <label className="field max-w-lg">
-          كلمة مرور للحساب التجريبي
+          كلمة مرور الحساب
           <input
             dir="ltr"
             type="password"
@@ -235,7 +235,7 @@ function NewEmployee({
             disabled={pending}
             className="mt-2 accent-primary"
           />
-          أؤكد إنشاء/استكمال حساب مصطنع دون إرسال بريد أو تغيير دور أي حساب
+          أؤكد إنشاء/استكمال حساب موظف دون إرسال بريد أو تغيير دور أي حساب
           موجود.
         </label>
         <Button type="submit" disabled={pending || !enabled || preview}>

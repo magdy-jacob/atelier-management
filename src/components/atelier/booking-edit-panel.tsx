@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useRef, useState, useSyncExternalStore } from "react";
 import { editBooking, type BookingEditState } from "@/app/booking-edit-actions";
 import { Button } from "@/components/ui/button";
 import { aggregateMoney } from "@/lib/admin-dashboard";
@@ -26,6 +26,7 @@ export type BookingChange = {
   actor_name: string | null;
   created_at: string;
 };
+const subscribeHydration = () => () => {};
 function EditForm({
   booking,
   enabled,
@@ -37,6 +38,11 @@ function EditForm({
   preview: boolean;
   onFeedback: (value: BookingEditState) => void;
 }) {
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    () => true,
+    () => false,
+  );
   const request = useRef<string | null>(null);
   const [start, setStart] = useState(booking.starts_on),
     [end, setEnd] = useState(booking.returns_on);
@@ -78,7 +84,7 @@ function EditForm({
             value={start}
             onChange={(e) => setStart(e.target.value)}
             required
-            disabled={pending}
+            disabled={pending || !hydrated}
           />
         </label>
         <label className="field">
@@ -89,7 +95,7 @@ function EditForm({
             value={end}
             onChange={(e) => setEnd(e.target.value)}
             required
-            disabled={pending}
+            disabled={pending || !hydrated}
           />
         </label>
         <label className="field">
@@ -104,7 +110,7 @@ function EditForm({
             step="0.01"
             required
             defaultValue={decimalPiasters(booking.agreed_price_piasters)}
-            disabled={pending}
+            disabled={pending || !hydrated}
           />
         </label>
       </div>
@@ -121,7 +127,7 @@ function EditForm({
           rows={3}
           required
           maxLength={500}
-          disabled={pending}
+          disabled={pending || !hydrated}
         />
       </label>
       <label className="flex items-start gap-3 text-xs leading-8">
@@ -130,12 +136,15 @@ function EditForm({
           type="checkbox"
           name="confirm"
           required
-          disabled={pending}
+          disabled={pending || !hydrated}
         />
         أؤكد تعديل الموعد والسعر فقط قبل التسليم، مع بقاء العميلة والفستان
         والإيصالات والسجل، دون رد مبالغ أو تغيير المقدم.
       </label>
-      <Button type="submit" disabled={pending || !enabled || preview}>
+      <Button
+        type="submit"
+        disabled={pending || !hydrated || !enabled || preview}
+      >
         {pending ? "جارٍ التحقق من التعديل..." : "حفظ تعديل الموعد والسعر"}
       </Button>
     </form>

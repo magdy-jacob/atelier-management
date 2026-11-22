@@ -88,7 +88,7 @@ async function makeCluster(port) {
   return { cluster, client, url: `postgresql://postgres:${PASSWORD}@127.0.0.1:${port}/postgres` };
 }
 
-async function applyMigrations(client,maxVersion=21) {
+async function applyMigrations(client,maxVersion=22) {
   const dir = await fs.readdir(MIGRATIONS_DIR);
   for (const file of dir.filter((f) => f.endsWith(".sql") && Number(f.slice(8,12))<=maxVersion).sort()) {
     await client.query(await fs.readFile(path.join(MIGRATIONS_DIR, file), "utf8"));
@@ -220,7 +220,7 @@ try {
     await A.client.query('rollback');
     const crypto=await import('node:crypto'); const source_migrations={};
     for(const f of (await fs.readdir(MIGRATIONS_DIR)).filter(f=>f.endsWith('.sql')).sort()) source_migrations[f]=crypto.createHash('sha256').update(await fs.readFile(path.join(MIGRATIONS_DIR,f))).digest('hex');
-    await fs.writeFile(fileURLToPath(new URL('../scripts/backup-schema-v21.json',import.meta.url)),JSON.stringify({signature,source_migrations,provider_function,provider_source:'https://raw.githubusercontent.com/supabase/supabase/master/apps/studio/components/interfaces/Database/Triggers/EventTriggersList/EventTriggers.constants.ts'},null,2)+'\n');
+    await fs.writeFile(fileURLToPath(new URL('../scripts/backup-schema-v22.json',import.meta.url)),JSON.stringify({signature,source_migrations,provider_function,provider_source:'https://raw.githubusercontent.com/supabase/supabase/master/apps/studio/components/interfaces/Database/Triggers/EventTriggersList/EventTriggers.constants.ts'},null,2)+'\n');
   }
   const canonicalModule=fileURLToPath(new URL('../scripts/backup_canonical.py',import.meta.url));
   execFileSync('python3',['-c',`import importlib.util,sys
@@ -240,11 +240,21 @@ sys.argv=['backup','--quiescent','--output',sys.argv[2]]
 m.main()`;
   const oldDashboard=(await fs.readFile(path.join(MIGRATIONS_DIR,'202611220005_admin_dashboard.sql'),'utf8')).replace('create function public.admin_dashboard','create or replace function public.admin_dashboard');
   const migration21=await fs.readFile(path.join(MIGRATIONS_DIR,'202611220021_daily_dashboard_completion.sql'),'utf8');
+  const migration22=await fs.readFile(path.join(MIGRATIONS_DIR,'202611220022_review_price_ranges.sql'),'utf8');
+  // Reconstruct the precise historical20 schema only inside this isolated fixture.
+  await A.client.query(`drop function public.set_dress_price_range(uuid,integer,bigint,bigint);drop trigger bump_price_version on public.dress_prices;alter table public.dress_prices drop constraint valid_price_range,drop column minimum_price_piasters,drop column maximum_price_piasters,drop column version;alter table public.dresses drop constraint dresses_code_check;alter table public.dresses add constraint dresses_code_check check(code ~ '^[a-zA-Z0-9_-]{1,40}$');`);
+  const staff17=await fs.readFile(path.join(MIGRATIONS_DIR,'202611220017_staff_accounts.sql'),'utf8');
+  for(const name of ['begin_employee_account','update_employee_profile']) {
+    const start=staff17.indexOf('create function public.'+name+'(');const end=staff17.indexOf('end $$;',start)+7;
+    await A.client.query(staff17.slice(start,end).replace('create function','create or replace function'));
+  }
   await A.client.query(oldDashboard);
   const historicRoot=await fs.mkdtemp(path.join(os.tmpdir(),'atelier-historic20-'));
   const historicAdapter=pythonAdapter.replace("'--quiescent','--output'","'--quiescent','--schema-version','20','--output'");
   execFileSync('python3',['-c',historicAdapter,capturePy,historicRoot],{env:{...toolEnv,SUPABASE_DB_URL:A.url,SUPABASE_PROJECT_URL:'https://isolatedtest.supabase.co'},stdio:'inherit'});
+  const historicHashes=Object.fromEntries(await Promise.all((await A.client.query("select tablename from pg_tables where schemaname='public'")).rows.map(async r=>[r.tablename,await tableHash(A.client,r.tablename)])));
   await A.client.query(migration21);
+  await A.client.query(migration22);
   execFileSync('python3',['-c',pythonAdapter,capturePy,root],{env:{...toolEnv,SUPABASE_DB_URL:A.url,SUPABASE_PROJECT_URL:'https://isolatedtest.supabase.co'},stdio:'inherit'});
   const entries=await fs.readdir(root);assert.equal(entries.length,1);
   const manifest=JSON.parse(await fs.readFile(path.join(root,entries[0],'manifest.json'),'utf8'));
@@ -342,7 +352,7 @@ m.main()`;
   execFileSync(pgRestore,['--data-only','--schema=public','--no-owner','--single-transaction','--exit-on-error','--dbname',C.url,path.join(profileRoot,profileEntries[0],'database.dump')],{env:restoreEnv,stdio:'inherit'});
   await C.client.query(integritySQL);await validateBindings(C.client,'Studio-profile restore');
   for(const t of tableNames) assert.equal(await tableHash(C.client,t),await tableHash(A.client,t),t);
-  const providerCat=await catalogCounts(C.client);assert.equal(providerCat.functions,'40');
+  const providerCat=await catalogCounts(C.client);assert.equal(providerCat.functions,'41');
   console.log('PASS actual Studio-profile archive round-trip:24 tables identical plus reviewed provider function/event configuration');
 
   // Historical20backup is NOT relabelled21: reconstruct20, restore20,
@@ -361,15 +371,16 @@ m.main()`;
   assert.equal((await verifyBackup(historicDir)).schema_version,20);
   execFileSync(pgRestore,['--data-only','--schema=public','--no-owner','--single-transaction','--exit-on-error','--dbname',D.url,path.join(historicDir,'database.dump')],{env:restoreEnv,stdio:'inherit'});
   await D.client.query(integritySQL);
-  for(const t of tableNames) assert.equal(await tableHash(D.client,t),await tableHash(A.client,t),t);
+  for(const t of tableNames) assert.equal(await tableHash(D.client,t),historicHashes[t],t);
   await D.client.query(migration21);
+  await D.client.query(migration22);
   for(const t of tableNames) assert.equal(await tableHash(D.client,t),await tableHash(A.client,t),t);
   await D.client.query('begin;set local role authenticated');
   await D.client.query("select set_config('request.jwt.claim.sub',$1,true)",[OLD_ADMIN]);
   const dashboard=(await D.client.query("select public.admin_dashboard(date '2026-11-22',date '2026-11-22') value")).rows[0].value;
   assert.equal(dashboard.public_available_dresses,1);assert.equal(dashboard.public_reserved_dresses,0);assert.equal(dashboard.public_unavailable_dresses,0);
   await D.client.query('rollback');
-  console.log('PASS historic20capture -> migrations1-20 -> data restore -> integrity ->21upgrade, all24table hashes unchanged and new dashboard counts correct');
+  console.log('PASS historic20capture -> migrations1-20 -> data restore -> integrity ->21->22upgrade, all24table final hashes match and new dashboard counts correct');
 
   // Content comparison on every public table.
   const tables = (await A.client.query(

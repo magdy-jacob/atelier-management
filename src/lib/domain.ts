@@ -17,7 +17,7 @@ export const availabilityLabels = {
 export const sampleDresses: Dress[] = [
   {
     id: "sage",
-    code: "AT-001",
+    code: "DR/001",
     name: "همسة زيتون",
     color: "أخضر مريمي",
     size: "M",
@@ -27,7 +27,7 @@ export const sampleDresses: Dress[] = [
   },
   {
     id: "rose",
-    code: "AT-002",
+    code: "DR/002",
     name: "وردة المساء",
     color: "وردي معتّق",
     size: "S",
@@ -37,7 +37,7 @@ export const sampleDresses: Dress[] = [
   },
   {
     id: "ivory",
-    code: "AT-003",
+    code: "DR/003",
     name: "لؤلؤة",
     color: "عاجي",
     size: "M",
@@ -47,7 +47,7 @@ export const sampleDresses: Dress[] = [
   },
   {
     id: "midnight",
-    code: "AT-004",
+    code: "DR/004",
     name: "ليلة مخمل",
     color: "أزرق ليلي",
     size: "L",
@@ -57,7 +57,7 @@ export const sampleDresses: Dress[] = [
   },
   {
     id: "plum",
-    code: "AT-005",
+    code: "DR/005",
     name: "لمسة ليلك",
     color: "موف",
     size: "S",
@@ -67,7 +67,7 @@ export const sampleDresses: Dress[] = [
   },
   {
     id: "gold",
-    code: "AT-006",
+    code: "DR/006",
     name: "خيط دهب",
     color: "ذهبي",
     size: "L",
@@ -172,6 +172,7 @@ export const money = (piasters: number) =>
   new Intl.NumberFormat("ar-EG", {
     style: "currency",
     currency: "EGP",
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(piasters / 100);
 export function toPiasters(value: string): number {

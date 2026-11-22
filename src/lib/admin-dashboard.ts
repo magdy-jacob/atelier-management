@@ -39,6 +39,7 @@ export function aggregateMoney(value: string) {
     maximumFractionDigits: 2,
   })
     .formatToParts(whole)
+    .filter((p) => cents !== BigInt(0) || (p.type !== "decimal" && p.type !== "fraction"))
     .map((p) => (p.type === "fraction" ? fraction : p.value))
     .join("");
 }

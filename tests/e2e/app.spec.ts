@@ -26,7 +26,7 @@ test("catalogue, filters, product privacy, responsive layout", async ({
   await expect(page.getByRole("link", { name: /وردة المساء/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /همسة زيتون/ })).toHaveCount(0);
   await page.getByRole("button", { name: "الكل", exact: true }).click();
-  await page.getByLabel("ابحثي بالاسم أو الكود").fill("AT-001");
+  await page.getByLabel("ابحثي بالاسم أو الكود").fill("DR/001");
   await expect(page.getByRole("link", { name: /همسة زيتون/ })).toBeVisible();
   await page.getByRole("link", { name: /همسة زيتون/ }).click();
   await expect(page.getByRole("heading", { name: "همسة زيتون" })).toBeVisible();
@@ -182,11 +182,9 @@ test("read-only records render on desktop/mobile; protected routes stay closed",
   await expect(
     page.getByRole("heading", { name: "سجل النشاط", exact: true }),
   ).toBeVisible();
-  await page
-    .getByText("عرض القيم السابقة والجديدة", { exact: true })
-    .first()
-    .click();
-  await expect(page.locator("pre").first()).toBeVisible();
+  await page.getByText("عرض التغييرات", { exact: true }).first().click();
+  await expect(page.locator("pre")).toHaveCount(0);
+  await expect(page.getByText("قبل", { exact: true }).first()).toBeVisible();
   await page.screenshot({
     path: "evidence/records-desktop.png",
     fullPage: true,
@@ -649,10 +647,12 @@ test("receipt report explains its cash basis and downloads only reconciled synth
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
-  await page.goto("/workspace/reports");
-  await expect(page).toHaveURL(/login/);
-  await page.goto("/workspace/reports/download?from=2026-12-01&to=2026-12-05");
-  await expect(page).toHaveURL(/login/);
+  const removed = await page.goto("/workspace/reports");
+  expect(removed?.status()).toBe(404);
+  const disabled = await page.request.get(
+    "/workspace/reports/download?from=2026-12-01&to=2026-12-05",
+  );
+  expect(disabled.status()).toBe(404);
 });
 
 test("image removal preview requires separate confirmation, never deletes and explains durable cleanup", async ({
@@ -809,7 +809,7 @@ test("cancellation and return-receipt previews show timing, role limits and reta
   await expect(page.getByText(/لا يُطالب بباقي قيمته/)).toBeVisible();
   await expect(
     page.getByText("المتبقي", { exact: true }).locator(".."),
-  ).toContainText("٠٫٠٠");
+  ).toContainText("٠");
   await page.screenshot({
     path: "evidence/cancelled-ledger-mobile.png",
     fullPage: true,
@@ -864,28 +864,28 @@ test("team preview protects admin role, labels synthetic creation and preserves 
   ).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "حفظ اسم وحالة الموظف", exact: true }),
-  ).toHaveCount(2);
+  ).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "تحقق وأكمل الربط فقط" }),
   ).toBeDisabled();
   await page
-    .getByLabel("معرف البريد", { exact: true })
+    .getByLabel("البريد الإلكتروني", { exact: true })
     .fill("test-browser@example.invalid");
   expect(
     await page
-      .getByLabel("معرف البريد", { exact: true })
+      .getByLabel("البريد الإلكتروني", { exact: true })
       .evaluate((e: HTMLInputElement) => e.checkValidity()),
   ).toBeTruthy();
   await page
-    .getByLabel("معرف البريد", { exact: true })
+    .getByLabel("البريد الإلكتروني", { exact: true })
     .fill("real@example.com");
   expect(
     await page
-      .getByLabel("معرف البريد", { exact: true })
+      .getByLabel("البريد الإلكتروني", { exact: true })
       .evaluate((e: HTMLInputElement) => e.checkValidity()),
-  ).toBeFalsy();
+  ).toBeTruthy();
   await page
-    .getByLabel("معرف البريد", { exact: true })
+    .getByLabel("البريد الإلكتروني", { exact: true })
     .fill("test-browser@example.invalid");
   await page
     .getByLabel("اسم الموظف", { exact: true })
@@ -900,9 +900,9 @@ test("team preview protects admin role, labels synthetic creation and preserves 
   await expect(
     page.getByLabel("اسم الموظف", { exact: true }).first(),
   ).toHaveValue("اختبار اسم يحتفظ به النموذج");
-  await expect(page.getByLabel("معرف البريد", { exact: true })).toHaveValue(
-    "test-browser@example.invalid",
-  );
+  await expect(
+    page.getByLabel("البريد الإلكتروني", { exact: true }),
+  ).toHaveValue("test-browser@example.invalid");
   await page.getByLabel("كلمة مرور الحساب", { exact: false }).fill("");
   await page.screenshot({ path: "evidence/team-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1012,8 +1012,9 @@ test("admin dress history keeps cancelled bookings and scoped audit values off e
     page.getByRole("heading", { name: "حجوزات الفستان وتاريخه، للأدمن" }),
   ).toBeVisible();
   await expect(page.getByText("ملغي", { exact: true })).toBeVisible();
-  await page.getByText("عرض القيم السابقة والجديدة", { exact: true }).click();
-  await expect(page.locator("pre").first()).toContainText("fixture-dress");
+  await page.getByText("عرض التغييرات", { exact: true }).click();
+  await expect(page.locator("pre")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("fixture-dress");
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: "evidence/dress-history-desktop.png",
@@ -1120,10 +1121,10 @@ test("admin manual catalogue counts are explicit and separate from financial per
   ).toBeVisible();
   await expect(
     page.getByText(/هذا ملخص قراءة للأدمن فقط، لا يغيّر السجلات/),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(
     page.getByText(/لا يوجد رد مبالغ تلقائي أو تصحيح استثنائي مفترض/),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(page.getByText(/مطلوب استكمالها/)).toHaveCount(0);
   for (const label of ["متاح للعرض", "محجوز للعرض", "غير متاح للعرض"])
     await expect(
@@ -1174,7 +1175,7 @@ test("persisted workspace shared design has image inventory, real-route links, m
     path: "evidence/workspace-studio-desktop.png",
     fullPage: true,
   });
-  await page.getByLabel("بحث المخزون بالاسم أو الكود").fill("AT-001");
+  await page.getByLabel("بحث المخزون بالاسم أو الكود").fill("DR/001");
   await expect(page.locator("#inventory .dress-card")).toHaveCount(1);
   await page.getByLabel("بحث المخزون بالاسم أو الكود").fill("");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1221,4 +1222,36 @@ test("persisted workspace shared design has image inventory, real-route links, m
   ).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("مشروع معرض أعمال");
   expect(errors).toEqual([]);
+});
+
+test("review catalogue hides team links and retains general/product WhatsApp enquiry", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator('a[href="/login"]')).toHaveCount(0);
+  const whatsapp = page.getByRole("link", {
+    name: "تواصلي مع الأتيليه على واتساب",
+  });
+  await expect(whatsapp).toHaveAttribute("href", /201286100573/);
+  await page.getByRole("link", { name: /همسة زيتون/ }).click();
+  const enquiry = page.getByRole("link", { name: /DR\/001 على واتساب/ });
+  const href = await enquiry.getAttribute("href");
+  expect(new URL(href!).searchParams.get("text")).toContain("DR/001");
+  await expect(page.locator('a[href="/login"]')).toHaveCount(0);
+});
+test("login password eye toggles visibility without submitting", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  const password = page.locator('[name="password"]');
+  await password.fill("Example-only-not-a-login");
+  await expect(password).toHaveAttribute("type", "password");
+  await page
+    .getByRole("button", { name: "إظهار كلمة المرور", exact: true })
+    .click();
+  await expect(password).toHaveAttribute("type", "text");
+  await page
+    .getByRole("button", { name: "إخفاء كلمة المرور", exact: true })
+    .click();
+  await expect(password).toHaveAttribute("type", "password");
 });

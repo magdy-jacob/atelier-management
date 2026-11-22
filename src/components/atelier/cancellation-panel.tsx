@@ -43,6 +43,7 @@ export function CancellationPanel({
     },
     {} as ActionState,
   );
+  if (!admin) return null;
   return (
     <section className="studio-card space-y-5 border-red-200 p-6 md:p-8">
       <h2 className="text-lg">إلغاء الحجز قبل التسليم</h2>

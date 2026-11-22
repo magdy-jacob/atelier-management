@@ -16,7 +16,7 @@ export async function verifyBackup(dir) {
   if(!recorded || typeof recorded!=='object') throw Error('missing_schema_provenance');
   const versions=Object.keys(recorded).map(name=>Number(/^20261122(\d{4})_/.exec(name)?.[1]));
   const schemaVersion=manifest.schema_version ?? Math.max(...versions);
-  if(![20,21].includes(schemaVersion) || versions.length!==schemaVersion || new Set(versions).size!==schemaVersion || versions.some(v=>!Number.isInteger(v)||v<1||v>schemaVersion)) throw Error('unknown_schema_version');
+  if(![20,21,22].includes(schemaVersion) || versions.length!==schemaVersion || new Set(versions).size!==schemaVersion || versions.some(v=>!Number.isInteger(v)||v<1||v>schemaVersion)) throw Error('unknown_schema_version');
   const fixture=JSON.parse(await fs.readFile(new URL('./backup-schema-v'+schemaVersion+'.json',import.meta.url),'utf8'));
   for(const [name,hash] of Object.entries(fixture.source_migrations)) if(recorded[name]!==hash) throw Error('migration_checksum_mismatch');
   return {...manifest,schema_version:schemaVersion};

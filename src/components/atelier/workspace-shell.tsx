@@ -33,7 +33,6 @@ const baseLinks = [
 ];
 const adminLinks = [
   { href: "/workspace/dashboard", label: "المالية والمؤشرات", icon: Wallet },
-  { href: "/workspace/reports", label: "التقارير والتصدير", icon: Wallet },
   { href: "/workspace/notifications", label: "التنبيهات", icon: Bell },
   { href: "/workspace/customers", label: "العملاء", icon: Users },
   { href: "/workspace/categories", label: "التصنيفات", icon: Tags },

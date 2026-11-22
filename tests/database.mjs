@@ -4541,6 +4541,33 @@ try {
       }
     },
   );
+  await check("review22 migration preserves existing rows and limits ranges to admin", async () => {
+    const before=(await client.query("select id,code,name from public.dresses order by id")).rows;
+    await client.query(await fs.readFile(new URL("../supabase/migrations/202611220022_review_price_ranges.sql",import.meta.url),"utf8"));
+    assert.deepEqual((await client.query("select id,code,name from public.dresses order by id")).rows,before);
+    const category22=(await client.query("insert into public.categories(name) values('Review22 category') returning id")).rows[0].id;
+    const reviewDress=(await client.query("insert into public.dresses(code,name,color,size,category_id) values('REVIEW22','Review22','Pink','M',$1) returning id",[category22])).rows[0].id;
+    const v=(await client.query("select version from public.dress_prices where dress_id=$1",[reviewDress])).rows[0]?.version??0;
+    await asUser(admin,"select public.set_dress_price_range($1,$2,200000,500000)",[reviewDress,v]);
+    await deny(employee,"select public.set_dress_price_range($1,1,1,2)",[reviewDress],/admin_required/);
+    assert.equal((await asUser(employee,"select * from public.dress_prices")).rows.length,0);
+    await client.query("begin;set local role anon");
+    await assert.rejects(()=>client.query("select * from public.dress_prices"),/permission denied/);await client.query("rollback");
+    await deny(admin,"select public.set_dress_price_range($1,$2,200000,500000)",[reviewDress,v],/stale_price_version/);
+    await deny(admin,"select public.set_dress_price_range($1,$2,500000,200000)",[reviewDress,v+1],/invalid_price_range/);
+    await client.query("begin");await client.query("update public.dresses set code='DR/001' where id=$1",[reviewDress]);await client.query("rollback");
+  });
+  await check("review22 accepts normal staff identities without changing their role or sending mail", async () => {
+    const job=(await asUser(admin,"select public.begin_employee_account(gen_random_uuid(),'Review Employee','review.staff@example.com') j")).rows[0].j;
+    assert.equal(job.full_name,'Review Employee');assert.equal(job.email,'review.staff@example.com');
+    await deny(employee,"select public.begin_employee_account(gen_random_uuid(),'Other','other@example.com')",[],/not_authorized/);
+    await deny(admin,"select public.begin_employee_account(gen_random_uuid(),'Invalid','not-an-email')",[],/invalid_employee_identity/);
+    const p=(await client.query("select * from public.profiles where id=$1",[employee])).rows[0];
+    await asUser(admin,"select public.update_employee_profile(gen_random_uuid(),$1,$2,'Employee Renamed',false,'Removal preserving history')",[employee,p.version]);
+    const after=(await client.query("select * from public.profiles where id=$1",[employee])).rows[0];assert.equal(after.id,p.id);assert.equal(after.role,'employee');assert.equal(after.active,false);assert.equal(after.full_name,'Employee Renamed');
+    assert.equal((await asUser(employee,"select * from public.bookings")).rows.length,0);
+    assert.ok((await client.query("select count(*)::int n from public.employee_profile_changes where employee_id=$1",[employee])).rows[0].n>0);
+  });
   console.log(`Database checks passed: ${checks}`);
 } finally {
   if (client) await client.end();

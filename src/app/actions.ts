@@ -54,7 +54,7 @@ export async function createDress(
         .trim()
         .min(1)
         .max(40)
-        .regex(/^[a-zA-Z0-9_-]+$/),
+        .regex(/^[a-zA-Z0-9_\/-]+$/),
       color: z.string().trim().min(1).max(60),
       size: z.string().trim().min(1).max(30),
       category_id: z.uuid(),
@@ -109,7 +109,7 @@ export async function editDress(
         .trim()
         .min(1)
         .max(40)
-        .regex(/^[a-zA-Z0-9_-]+$/),
+        .regex(/^[a-zA-Z0-9_\/-]+$/),
       color: z.string().trim().min(1).max(60),
       size: z.string().trim().min(1).max(30),
       category_id: z.uuid(),
@@ -1079,4 +1079,19 @@ export async function cancelBooking(
     success:
       "سُجل الإلغاء قبل التسليم، مع الاحتفاظ بالمقدم وتحرير الموعد. الدفعات والسجل محفوظان؛ لا رد مال تلقائي.",
   };
+}
+
+export async function saveDressPriceRange(_prior: ActionState, form: FormData): Promise<ActionState> {
+ const {db,profile}=await requireStaff();
+ if(profile.role!=="admin") return {error:"غير مسموح"};
+ const {toPiasters}=await import("@/lib/domain");
+ const id=z.uuid().safeParse(form.get("dress_id"));
+ const version=z.coerce.number().int().nonnegative().safeParse(form.get("version"));
+ let min:number,max:number;
+ try {min=toPiasters(String(form.get("minimum")));max=toPiasters(String(form.get("maximum")));} catch {return {error:"اكتب نطاق أسعار صحيحًا."};}
+ if(!id.success || !version.success || max<min) return {error:"السعر الأعلى يجب ألا يقل عن السعر الأدنى."};
+ const {error}=await db.rpc("set_dress_price_range",{p_dress_id:id.data,p_expected_version:version.data,p_min:min,p_max:max});
+ if(error) return {error:error.message.includes("stale_price_version") ? "تغير السعر منذ فتح الصفحة. حدّث الصفحة وراجع القيمة الأحدث." : "تعذر حفظ نطاق السعر."};
+ revalidatePath(`/workspace/dresses/${id.data}`);
+ return {success:"تم حفظ نطاق السعر."};
 }

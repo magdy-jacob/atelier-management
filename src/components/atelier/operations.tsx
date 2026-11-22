@@ -91,12 +91,7 @@ export function OperationsBoard({
           الشهر الحالي
         </Link>
       </div>
-      <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
-        هذه قراءة للمواعيد والحالات المسجلة، لا تؤكد تسليمًا أو عودة فعلية. فترة
-        التجهيز في التقويم محسوبة من موعد العودة المخطط. لا تُرسل إشعارات خارج
-        الموقع، ولا تُحسب غرامة تلقائيًا. تغيرات اليوم تظهر عند إعادة تحميل
-        الصفحة.
-      </p>
+      
       {truncated && (
         <p
           role="alert"

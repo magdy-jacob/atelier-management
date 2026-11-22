@@ -1,3 +1,4 @@
+import { WhatsAppContact } from "@/components/atelier/whatsapp-contact";
 import { DressGallery } from "@/components/atelier/dress-gallery";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -76,12 +77,13 @@ export default async function DressDetails({
             </div>
             {demo && (
               <p className="mt-5 text-xs text-muted-foreground">
-                هذه بيانات وصورة مولدة للتجربة فقط. تفاصيل التواصل لم تُضف بعد.
+                هذه بيانات وصورة مولدة للتجربة فقط.
               </p>
             )}
           </div>
         </div>
       </main>
+      <WhatsAppContact code={d.code}/>
     </>
   );
 }

@@ -116,6 +116,18 @@ function EmployeeEditor({
     </form>
   );
 }
+function RemoveEmployee({ profile, enabled, preview, onFeedback }: {profile:TeamProfile;enabled:boolean;preview:boolean;onFeedback:Feedback}) {
+ const request=useRef<string|null>(null);
+ const [,action,pending]=useActionState(async (previous:StaffActionState,form:FormData)=>{
+   request.current ??= crypto.randomUUID();form.set("request_id",request.current);
+   const result=await updateEmployeeProfile(previous,form);onFeedback(result);if(result.success) request.current=null;return result;
+ },{});
+ return <form action={preview?undefined:action} onSubmit={preview?e=>e.preventDefault():undefined} className="space-y-4 border-t pt-5">
+   <input type="hidden" name="employee_id" value={profile.id}/><input type="hidden" name="version" value={profile.version}/><input type="hidden" name="name" value={profile.full_name}/><input type="hidden" name="reason" value="حذف الموظف من قائمة الفريق مع حفظ سجلاته"/>
+   <label className="flex items-start gap-3 text-xs leading-7"><input type="checkbox" name="confirm" required className="mt-2 accent-primary"/>أؤكد حذف هذا الموظف ومنع دخوله، مع الاحتفاظ باسمه في الحجوزات والمدفوعات القديمة.</label>
+   <Button type="submit" variant="outline" disabled={!enabled||preview||pending}>{pending?"جارٍ الحذف...":"حذف الموظف"}</Button>
+ </form>;
+}
 function NewEmployee({
   enabled,
   preview,
@@ -158,9 +170,7 @@ function NewEmployee({
         {job ? "استكمال طلب محفوظ" : "إنشاء حساب موظف"}
       </h2>
       <p className="text-xs leading-8 text-muted-foreground">
-        حساب تسجيل دخول بصلاحية موظف فقط. لا تُرسل دعوة بريدية. الاسم يبدأ بكلمة
-        اختبار. البريد معرف غير قابل للتواصل ضمن example.invalid. لا تستخدم اسمًا
-        أو بريدًا أو كلمة مرور تخص شخصًا حقيقيًا.
+        حساب تسجيل دخول بصلاحية موظف فقط. اكتب اسم الموظف وبريده الإلكتروني. لا تُرسل دعوة أو رسالة بريدية تلقائيًا.
       </p>
       {!enabled && !preview && (
         <p className="rounded-xl bg-secondary p-4 text-xs leading-7">
@@ -186,22 +196,22 @@ function NewEmployee({
             <input
               name="name"
               required
-              minLength={8}
+              minLength={1}
               maxLength={120}
-              defaultValue={job?.full_name ?? "اختبار موظف جديد"}
+              defaultValue={job?.full_name ?? ""}
               readOnly={!!job}
               disabled={pending}
             />
           </label>
           <label className="field">
-            معرف البريد
+            البريد الإلكتروني
             <input
               dir="ltr"
               name="email"
               type="email"
               required
-              pattern="test-[a-z0-9][a-z0-9._\-]{0,39}@example\.invalid"
-              placeholder="test-staff@example.invalid"
+              placeholder="name@example.com"
+              maxLength={100}
               defaultValue={job?.email ?? ""}
               readOnly={!!job}
               disabled={pending}
@@ -309,7 +319,8 @@ export function TeamManager({
   preview?: boolean;
 }) {
   const [feedback, setFeedback] = useState<StaffActionState>({}),
-    [resume, setResume] = useState<TeamJob | null>(null);
+    [resume, setResume] = useState<TeamJob | null>(null),
+    [showRemoved, setShowRemoved] = useState(false);
   return (
     <div className="space-y-6">
       {preview && (
@@ -360,9 +371,10 @@ export function TeamManager({
         <p className="text-xs leading-8 text-muted-foreground">
           التعطيل يوقف صلاحيات التطبيق فورًا ولا يحذف حساب Auth أو سجلات
           الحجوزات. الحسابات الإدارية محمية، ولا ترقية أدوار من هذه الشاشة.
-          الاسم المعدل يبدأ بكلمة اختبار.
+
         </p>
-        {profiles.map((p) => (
+        <Button variant="outline" onClick={() => setShowRemoved(!showRemoved)}>{showRemoved ? "عرض الفريق الحالي" : "عرض الموظفين المحذوفين"}</Button>
+        {profiles.filter(p => showRemoved ? p.role === "employee" && !p.active : p.active || p.role === "admin").map((p) => (
           <article
             key={`${p.id}:${p.version}`}
             className="studio-card space-y-5 p-6"
@@ -392,6 +404,7 @@ export function TeamManager({
                 </Badge>
               </div>
             </div>
+            {p.role === "employee" && p.active && <RemoveEmployee profile={p} enabled={managementEnabled} preview={preview} onFeedback={setFeedback}/>}
             {p.role === "employee" && (
               <EmployeeEditor
                 profile={p}

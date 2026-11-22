@@ -12,8 +12,8 @@ export default async function Bookings() {
   const { data, error } = await db
     .from("bookings")
     .select(workspaceBookingColumns)
-    .order("starts_on", { ascending: false })
-    .limit(100);
+    .order("created_at", { ascending: false })
+    .limit(10);
   const bookings = (data ?? []).map((b) =>
     bookingForWorkspace(
       b,
@@ -24,7 +24,7 @@ export default async function Bookings() {
   return (
     <StaffFrame
       title="الحجوزات"
-      description="آخر ١٠٠ حجز من كل حجوزات الأتيليه. الموظف والأدمن يسجلان المقدم والباقي المستلم، دون إتاحة لوحة مالية عامة للموظف."
+      description="آخر ١٠ حجوزات."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/bookings"

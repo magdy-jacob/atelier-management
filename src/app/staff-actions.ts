@@ -113,17 +113,8 @@ export async function createEmployeeAccount(
   const p = z
     .object({
       request_id: z.uuid(),
-      name: z
-        .string()
-        .trim()
-        .min(8)
-        .max(120)
-        .refine((v) => v.startsWith("اختبار ")),
-      email: z
-        .string()
-        .trim()
-        .toLowerCase()
-        .regex(/^test-[a-z0-9][a-z0-9._-]{0,39}@example\.invalid$/),
+      name: z.string().trim().min(1).max(120),
+      email: z.string().trim().toLowerCase().email().max(100),
       password: z.string().refine(validEmployeePassword),
       confirm: z.literal("on"),
     })
@@ -131,7 +122,7 @@ export async function createEmployeeAccount(
   if (!p.success)
     return {
       error:
-        "راجع صيغة الاسم ومعرف البريد test-...@example.invalid، وكلمة مرور12حرفًا على الأقل وبحد72بايت، ثم أكد الإنشاء دون إرسال بريد.",
+        "راجع الاسم والبريد الإلكتروني وكلمة مرور من 12حرفًا على الأقل وبحد72بايت، ثم أكد الإنشاء دون إرسال بريد.",
     };
   const { data, error } = await c.db.rpc("begin_employee_account", {
     p_request_id: p.data.request_id,

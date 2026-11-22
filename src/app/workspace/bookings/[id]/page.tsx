@@ -1,3 +1,4 @@
+import { bookingNumber } from "@/lib/presentation";
 import { BookingEditPanel } from "@/components/atelier/booking-edit-panel";
 import { CancellationPanel } from "@/components/atelier/cancellation-panel";
 import { BookingWorkflow } from "@/components/atelier/booking-workflow";
@@ -122,8 +123,8 @@ export default async function BookingDetails({
   const customer = Array.isArray(b.customers) ? b.customers[0] : b.customers;
   return (
     <StaffFrame
-      title={`حجز ${dress?.name ?? ""}`}
-      description="تفاصيل الحجز وسجل مبالغه المستلمة والمستحقة ضمن صلاحيات الحساب. لا تحصيل إلكتروني. التسليم والعودة والفحص بحسب الصلاحيات. الإلغاء للأدمن قبل التسليم فقط، والمقدم غير مسترد. لا ردّ مبالغ تلقائي."
+      title={bookingNumber(b.id) ? `حجز ${bookingNumber(b.id)}` : `حجز ${dress?.name ?? ""}`}
+      description="تفاصيل الحجز وسجل الدفعات."
       name={profile.full_name}
       role={profile.role}
       active="/workspace"
@@ -136,10 +137,10 @@ export default async function BookingDetails({
               href={`/workspace/customers/${b.customer_id}`}
               className="underline underline-offset-4"
             >
-              {customer?.full_name ?? "غير متاح"}
+              {bookingNumber(b.id) ? `عملية ${bookingNumber(b.id)}` : customer?.full_name ?? "غير متاح"}
             </Link>
           ) : (
-            <p>{customer?.full_name ?? "غير متاح"}</p>
+            <p>{bookingNumber(b.id) ? `عملية ${bookingNumber(b.id)}` : customer?.full_name ?? "غير متاح"}</p>
           )}
           <p dir="ltr" className="mt-3 text-right">
             {customer?.phone}
@@ -154,9 +155,7 @@ export default async function BookingDetails({
         </div>
         <div>
           <p className="mb-3 text-muted-foreground">مرجع الحجز</p>
-          <p dir="ltr" className="break-all font-mono text-[10px]">
-            {b.id}
-          </p>
+          <p className="text-sm">{bookingNumber(b.id) ?? "حجز"}</p>
           <Link
             className="mt-3 inline-block underline underline-offset-4"
             href={`/workspace/dresses/${b.dress_id}`}
@@ -260,10 +259,7 @@ export default async function BookingDetails({
           cancellation={cancellation}
         />
       )}
-      <p className="rounded-xl border border-pink-200 bg-pink-50 p-5 text-xs leading-7">
-        العمليات والتقويم يستخدمان أيام مصر. الحالة المسجلة هنا لا تتغير تلقائيًا
-        مع مرور الموعد؛ يلزم إجراء تسليم أو عودة معتمد.
-      </p>
+
     </StaffFrame>
   );
 }

@@ -1,3 +1,4 @@
+import { PriceRangeEditor } from "@/components/atelier/price-range-editor";
 import { DressHistory } from "@/components/atelier/dress-history";
 import { Unavailable } from "@/components/atelier/staff-frame";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,17 @@ export default async function ManageDress({
   if ((error && error.code !== "PGRST116") || categoriesError || photosError)
     throw new Error("تعذر تحميل بيانات الفستان أو صوره.");
   if (!dress) notFound();
+  const price =
+    profile.role === "admin"
+      ? await db
+          .from("dress_prices")
+          .select(
+            "advisory_price_piasters,minimum_price_piasters,maximum_price_piasters,version",
+          )
+          .eq("dress_id", id)
+          .maybeSingle()
+      : null;
+  if (price?.error) throw new Error("تعذر تحميل نطاق السعر.");
   const cleanup =
     profile.role === "admin"
       ? await db
@@ -61,7 +73,7 @@ export default async function ManageDress({
             .select("id,starts_on,returns_on,status,agreed_price_piasters")
             .eq("dress_id", id)
             .order("starts_on", { ascending: false })
-            .limit(100),
+            .limit(10),
           db
             .from("activity_logs")
             .select(
@@ -71,7 +83,7 @@ export default async function ManageDress({
               `entity_id.eq.${id},old_data->>dress_id.eq.${id},new_data->>dress_id.eq.${id}`,
             )
             .order("id", { ascending: false })
-            .limit(100),
+            .limit(10),
           db.from("profiles").select("id,full_name"),
         ])
       : null;
@@ -94,11 +106,7 @@ export default async function ManageDress({
       >
         ← العودة لمساحة العمل
       </Link>
-      <p className="mb-8 text-xs leading-7 text-muted-foreground">
-        {profile.role === "admin"
-          ? "إدارة البيانات والصور والأرشفة. السعر الإداري وعمليات الحجز تبقى منفصلة."
-          : "بيانات الفستان. التعديل ورفع الصور للأدمن فقط."}
-      </p>
+
       <InventoryEditor
         key={dress.id}
         dress={dress}
@@ -107,6 +115,9 @@ export default async function ManageDress({
         readOnly={profile.role !== "admin"}
         cleanupJobs={cleanup?.data ?? []}
       />
+      {profile.role === "admin" && (
+        <PriceRangeEditor dressId={id} price={price?.data ?? null} />
+      )}
       {history &&
         (historyError ? (
           <Unavailable />

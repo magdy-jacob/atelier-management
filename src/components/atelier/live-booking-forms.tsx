@@ -225,16 +225,7 @@ export function LivePaymentForm({
     recordRealPayment,
     {} as ActionState,
   );
-  if (!context)
-    return (
-      <section className="studio-card space-y-4 p-6">
-        <Feedback state={state} />
-        <p className="text-xs leading-8 text-muted-foreground">
-          لا توجد دفعة إضافية متاحة الآن. قبل عودة العميلة يُسجل المقدم الأول
-          فقط؛ الباقي عند عودتها بالفستان. الحجز المغلق لا يقبل دفعات جديدة.
-        </p>
-      </section>
-    );
+  if (!context) return null;
   return (
     <section className="studio-card p-6">
       <h2 className="mb-3 text-base">

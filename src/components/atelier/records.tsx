@@ -1,3 +1,10 @@
+import {
+  auditChanges,
+  auditLabels,
+  valueLabels,
+  bookingNumber,
+  recordedDay,
+} from "@/lib/presentation";
 import { aggregateMoney } from "@/lib/admin-dashboard";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +19,31 @@ export type AuditRecord = {
   old_data: unknown;
   new_data: unknown;
 };
+function AuditValue({ value, field }: { value: unknown; field: string }) {
+  if (value === null || value === undefined)
+    return <span className="text-muted-foreground">غير مسجل</span>;
+  if (typeof value === "boolean") return <span>{value ? "نعم" : "لا"}</span>;
+  if (field.endsWith("_piasters") && /^\d+$/.test(String(value)))
+    return <span>{aggregateMoney(String(value))}</span>;
+  if (
+    field.endsWith("_at") &&
+    typeof value === "string" &&
+    !Number.isNaN(Date.parse(value))
+  )
+    return <span>{recordedDay(value)}</span>;
+  if (Array.isArray(value))
+    return (
+      <span>
+        {value.map((v) => valueLabels[String(v)] ?? String(v)).join("، ")}
+      </span>
+    );
+  if (typeof value === "object") return <span>بيانات مرتبطة</span>;
+  return (
+    <span className="break-words" dir="auto">
+      {valueLabels[String(value)] ?? String(value)}
+    </span>
+  );
+}
 export function AuditTable({
   logs,
   names = {},
@@ -26,53 +58,58 @@ export function AuditTable({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="outline" dir="ltr">
-                {log.action}
+                {log.action === "INSERT" ? "CREATE" : log.action}
               </Badge>
-              <span dir="ltr" className="font-mono text-xs">
-                {log.entity}
+              <span className="text-xs">
+                {auditLabels[log.entity] ?? "سجل مرتبط"}
               </span>
               <span className="text-xs text-muted-foreground">
-                {log.actor_id
-                  ? (names[log.actor_id] ?? log.actor_id.slice(0, 8))
-                  : "النظام"}
+                {log.actor_id ? (names[log.actor_id] ?? "حساب سابق") : "النظام"}
               </span>
             </div>
             <time
               dateTime={log.created_at}
-              dir="ltr"
               className="text-[10px] text-muted-foreground"
             >
-              {new Date(log.created_at)
-                .toISOString()
-                .replace("T", " ")
-                .replace(".000Z", " UTC")}
+              {new Intl.DateTimeFormat("ar-EG", {
+                timeZone: "Africa/Cairo",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(new Date(log.created_at))}
             </time>
           </div>
-          <p
-            dir="ltr"
-            className="break-all text-left font-mono text-[10px] text-muted-foreground"
-          >
-            {log.entity_id ?? "بدون معرف كيان"}
-          </p>
           <details className="rounded-xl border bg-muted/30 p-3 text-xs">
-            <summary className="cursor-pointer">
-              عرض القيم السابقة والجديدة
-            </summary>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {[
-                ["قبل", log.old_data],
-                ["بعد", log.new_data],
-              ].map(([label, value]) => (
-                <div key={String(label)}>
-                  <p className="mb-2 text-muted-foreground">{String(label)}</p>
-                  <pre
-                    dir="ltr"
-                    className="max-h-72 overflow-auto rounded-lg bg-white p-3 text-left text-[10px] leading-6 whitespace-pre-wrap break-all"
-                  >
-                    {JSON.stringify(value, null, 2) ?? "null"}
-                  </pre>
+            <summary className="cursor-pointer">عرض التغييرات</summary>
+            <div className="mt-4 space-y-3">
+              {auditChanges(log.old_data, log.new_data).map((change) => (
+                <div
+                  key={change.key}
+                  className="rounded-xl border bg-white p-4"
+                >
+                  <p className="mb-3 font-medium">{change.label}</p>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 leading-7">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground">قبل</p>
+                      <AuditValue value={change.before} field={change.key} />
+                    </div>
+                    <span aria-label="أصبح" className="pt-6 text-primary">
+                      ←
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground">بعد</p>
+                      <AuditValue value={change.after} field={change.key} />
+                    </div>
+                  </div>
                 </div>
               ))}
+              {!auditChanges(log.old_data, log.new_data).length && (
+                <p className="p-3 text-muted-foreground">
+                  تحديث بيانات مرتبطة بالسجل.
+                </p>
+              )}
             </div>
           </details>
         </article>
@@ -120,7 +157,7 @@ export function BookingList({
               dir="ltr"
               className="font-mono text-[10px] text-muted-foreground"
             >
-              {b.id.slice(0, 12)}
+              {bookingNumber(b.id) ? `حجز ${bookingNumber(b.id)}` : ""}
             </p>
           </div>
           <div className="space-y-2 text-xs">
@@ -210,7 +247,7 @@ export function BookingLedger({
                   dir="ltr"
                   className="block text-[10px] text-muted-foreground"
                 >
-                  {new Date(p.recorded_at).toISOString().replace("T", " ")}
+                  {recordedDay(p.recorded_at)}
                 </time>
               </div>
               <p>{money(Number(p.amount_piasters))}</p>
@@ -224,8 +261,7 @@ export function BookingLedger({
         </div>
         <p className="mt-5 text-[10px] leading-7 text-muted-foreground">
           هذه مبالغ مسجلة في النظام، وليست إثباتًا مستقلًا لوصول تحويل بنكي أو
-          تحصيل إلكتروني. الأوقات المعروضة UTC. لا توجد أزرار دفع أو استرداد
-          هنا.
+          تحصيل إلكتروني. لا توجد أزرار دفع أو استرداد هنا.
         </p>
       </section>
     </div>

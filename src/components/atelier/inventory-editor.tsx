@@ -78,7 +78,7 @@ export function InventoryEditor({
         <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg">بيانات الفستان</h2>
           <Badge variant="outline" className="text-[10px]">
-            {dress.archived ? "مؤرشف" : "في المخزون"} · نسخة {dress.version}
+            {dress.archived ? "مؤرشف" : "في المخزون"}
           </Badge>
         </div>
         <form
@@ -106,6 +106,8 @@ export function InventoryEditor({
                   required
                   maxLength={max}
                   readOnly={readOnly}
+                  disabled={readOnly}
+                  className={readOnly ? "!cursor-default disabled:opacity-100" : undefined}
                 />
               </label>
             ))}
@@ -138,11 +140,7 @@ export function InventoryEditor({
               </select>
             </label>
           </div>
-          <div className="rounded-xl bg-secondary p-4 text-[11px] leading-7 text-muted-foreground">
-            حالة العرض يدوية في هذه المرحلة، ولا تثبت التوفر في موعد معين. السعر
-            الاسترشادي لا يظهر هنا لحين اعتماد شكل تخزينه. التعديلات المتزامنة
-            محمية برقم نسخة لمنع الكتابة فوق تعديل أحدث.
-          </div>
+
           {!readOnly && (
             <>
               <Message state={editState} />

@@ -42,7 +42,7 @@ class Session:
         try: self.p.communicate('rollback;\n', timeout=10)
         except Exception: self.p.kill(); self.p.wait()
 
-def capture(s,provider_profile=None,schema_version=21):
+def capture(s,provider_profile=None,schema_version=22):
     signature=sorted(s.query(SIGNATURE_SQL))
     expected=json.loads(pathlib.Path(__file__).with_name(f'backup-schema-v{schema_version}.json').read_text())
     wanted=canonical(expected['signature'])
@@ -75,7 +75,7 @@ def download(base, name):
         return response.read()
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument('--quiescent',action='store_true',help='Confirm all writers are stopped until backup finishes'); p.add_argument('--output',default='backups'); p.add_argument('--schema-version',type=int,choices=[20,21],default=21); p.add_argument('--provider-profile',choices=['supabase-studio-v1']); a=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument('--quiescent',action='store_true',help='Confirm all writers are stopped until backup finishes'); p.add_argument('--output',default='backups'); p.add_argument('--schema-version',type=int,choices=[20,21,22],default=22); p.add_argument('--provider-profile',choices=['supabase-studio-v1']); a=p.parse_args()
     if not a.quiescent: raise RuntimeError('Stop app/admin/Storage writers first, then pass --quiescent')
     env=dict(os.environ)
     if env.get('PGBIN'): env['PATH']=env['PGBIN']+os.pathsep+env.get('PATH','')

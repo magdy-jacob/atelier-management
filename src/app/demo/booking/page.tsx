@@ -15,7 +15,7 @@ export default function BookingFormPreview() {
     >
       <LiveBookingForm
         preview
-        dresses={[{ id: "demo", name: "همسة زيتون", code: "AT-001" }]}
+        dresses={[{ id: "demo", name: "همسة زيتون", code: "DR/001" }]}
         methods={["كاش", "إنستاباي", "أورانج كاش", "فودافون كاش"]}
         enabled={false}
         requestId="demo-request"

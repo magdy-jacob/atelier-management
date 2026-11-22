@@ -1,3 +1,4 @@
+import { cairoMidnight } from "@/lib/presentation";
 export const dynamic = "force-dynamic";
 import { requireStaff } from "@/lib/supabase/auth";
 import {
@@ -53,8 +54,8 @@ export default async function Activity({
     .order("id", { ascending: false })
     .limit(100);
   if (entity) query = query.eq("entity", entity);
-  if (from) query = query.gte("created_at", `${from}T00:00:00Z`);
-  if (to) query = query.lt("created_at", `${addDays(to, 1)}T00:00:00Z`);
+  if (from) query = query.gte("created_at", cairoMidnight(from));
+  if (to) query = query.lt("created_at", cairoMidnight(addDays(to, 1)));
   const [{ data: logs, error }, { data: staff }] = await Promise.all([
     query,
     db.from("profiles").select("id,full_name"),
@@ -65,7 +66,7 @@ export default async function Activity({
   return (
     <StaffFrame
       title="سجل النشاط"
-      description="آخر ١٠٠ حدث مطابق، للأدمن فقط. لا يمكن تعديل أو حذف السجل من حسابات التطبيق. التوقيت والفلاتر الزمنية هنا UTC كما هو موضح في الحقول؛ تواريخ الحجز والتشغيل بأيام مصر."
+      description="آخر ١٠٠ حدث مطابق."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/activity"
@@ -84,11 +85,11 @@ export default async function Activity({
           </select>
         </label>
         <label className="field">
-          من يوم (UTC)
+          من يوم
           <input type="date" name="from" defaultValue={from} />
         </label>
         <label className="field">
-          إلى يوم (UTC)
+          إلى يوم
           <input type="date" name="to" defaultValue={to} />
         </label>
         <Button type="submit" className="h-11">

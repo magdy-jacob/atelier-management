@@ -1,6 +1,6 @@
+import { WhatsAppContact } from "@/components/atelier/whatsapp-contact";
 import Image from "next/image";
-import Link from "next/link";
-import { ArrowDown, ArrowUpLeft, Sparkles, Heart } from "lucide-react";
+import { ArrowDown, Sparkles, Heart } from "lucide-react";
 import { Header, DemoNotice, Brand } from "@/components/atelier/chrome";
 import { Catalogue } from "@/components/atelier/catalogue";
 import { getCatalogue } from "@/lib/catalogue";
@@ -95,12 +95,10 @@ export default async function Home() {
           <p className="text-[10px] text-muted-foreground">
             كتالوج الفساتين · لا يوجد حجز أو دفع إلكتروني
           </p>
-          <Link className="text-xs text-muted-foreground" href="/login">
-            مساحة الفريق
-            <ArrowUpLeft className="mr-2 inline size-3" />
-          </Link>
+
         </div>
       </footer>
+      <WhatsAppContact/>
     </>
   );
 }

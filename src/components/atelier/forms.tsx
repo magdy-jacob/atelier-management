@@ -1,5 +1,5 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   signIn,
   createCategory,
@@ -7,6 +7,7 @@ import {
   ActionState,
 } from "@/app/actions";
 import { Button } from "@/components/ui/button";
+import { Eye, EyeOff } from "lucide-react";
 const initial: ActionState = {};
 function Feedback({ state }: { state: ActionState }) {
   return (
@@ -32,6 +33,7 @@ function Feedback({ state }: { state: ActionState }) {
 }
 export function LoginForm({ ready }: { ready: boolean }) {
   const [state, action, pending] = useActionState(signIn, initial);
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <form action={action} className="space-y-5">
       <label className="field">
@@ -47,14 +49,18 @@ export function LoginForm({ ready }: { ready: boolean }) {
       </label>
       <label className="field">
         كلمة المرور
-        <input
+        <div className="relative">
+        <input className="!pl-12 w-full"
           name="password"
-          type="password"
+          type={showPassword ? "text" : "password"}
           dir="ltr"
           autoComplete="current-password"
           required
           maxLength={256}
         />
+        <button type="button" aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary">
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button></div>
       </label>
       <Feedback state={state} />
       <Button

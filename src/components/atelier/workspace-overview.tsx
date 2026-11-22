@@ -1,4 +1,5 @@
 "use client";
+import { bookingNumber } from "@/lib/presentation";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -57,7 +58,7 @@ export function WorkspaceBookingTable({
                 dir="ltr"
                 className="mt-1 text-right font-mono text-[9px] text-muted-foreground"
               >
-                {b.id.slice(0, 8)}
+                {bookingNumber(b.id) ? `حجز ${bookingNumber(b.id)}` : ""}
               </p>
             </div>
           </div>

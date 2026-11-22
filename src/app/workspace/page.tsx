@@ -47,7 +47,7 @@ export default async function Workspace({
       .from("bookings")
       .select(workspaceBookingColumns)
       .order("created_at", { ascending: false })
-      .limit(25),
+      .limit(10),
     db
       .from("bookings")
       .select(workspaceBookingColumns)

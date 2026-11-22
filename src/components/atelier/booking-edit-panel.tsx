@@ -166,6 +166,7 @@ export function BookingEditPanel({
   preview?: boolean;
 }) {
   const [feedback, setFeedback] = useState<BookingEditState>({});
+  if (!admin) return null;
   return (
     <section className="studio-card space-y-6 p-6 md:p-8">
       <h2 className="text-lg">تعديل الموعد والسعر</h2>

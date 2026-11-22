@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowUpLeft } from "lucide-react";
+
 export function Brand({ dark = false }: { dark?: boolean }) {
   return (
     <Link
@@ -39,13 +39,7 @@ export function Header() {
           <Link className="hidden sm:block" href="/#collection">
             مجموعة الفساتين
           </Link>
-          <Link
-            href="/login"
-            className="flex items-center gap-2 border-b border-primary/40 pb-1"
-          >
-            دخول الفريق
-            <ArrowUpLeft size={14} />
-          </Link>
+
         </nav>
       </div>
     </header>
@@ -57,12 +51,8 @@ export function DemoNotice({ short = false }: { short?: boolean }) {
       {short
         ? "معاينة غير متصلة. لا تُحفظ التغييرات هنا."
         : "مجموعة صور توضيحية، وليست تأكيدًا لتوفر فستان أو موعد."}
-      <Link
-        href="/workspace"
-        className="mx-3 inline-block font-medium underline underline-offset-4"
-      >
-        دخول مساحة العمل
-      </Link>
+
+      {short && <Link href="/workspace" className="mx-3 inline-block font-medium underline">دخول مساحة العمل</Link>}
     </div>
   );
 }

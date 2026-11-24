@@ -16,5 +16,11 @@ export async function requireStaff() {
     .single();
   if (!profile?.active)
     throw new Error("الحساب غير نشط أو لم يمنح صلاحيات من الأدمن.");
-  return { db, user, profile };
+  const effectiveRole =
+    user.app_metadata?.role === "admin" ||
+    user.user_metadata?.role === "admin" ||
+    profile.role === "admin"
+      ? "admin"
+      : "employee";
+  return { db, user, profile: { ...profile, role: effectiveRole } };
 }

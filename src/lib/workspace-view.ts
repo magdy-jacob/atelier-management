@@ -1,4 +1,4 @@
-import { bookingNumber } from "./presentation";
+import { bookingNumber, displayCustomerName } from "./presentation";
 import type { WorkspaceBooking } from "@/components/atelier/workspace-overview";
 type Relation<T> = T | T[] | null;
 export type WorkspaceImage = { id: string; path: string; sort_order: number };
@@ -42,7 +42,9 @@ export function bookingForWorkspace(
     id: b.id,
     dressName: d?.name ?? "فستان غير متاح",
     image: firstWorkspaceImage(d?.dress_images ?? [], urlFor),
-    customerName: bookingNumber(b.id) ? `عملية ${bookingNumber(b.id)}` : c?.full_name ?? "عميل غير متاح",
+    customerName: bookingNumber(b.id)
+      ? `عملية ${bookingNumber(b.id)}`
+      : displayCustomerName(c?.full_name, "عميل غير متاح"),
     starts_on: b.starts_on,
     returns_on: b.returns_on,
     status: b.status,

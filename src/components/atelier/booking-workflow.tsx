@@ -79,10 +79,7 @@ function HandoverForm({
       <input type="hidden" name="booking_id" value={bookingId} />
       <input type="hidden" name="expected_day" value={today} />
       <h3 className="text-base">تسليم الفستان للعميل</h3>
-      <p className="text-xs leading-7 text-muted-foreground">
-        يكفي مقدم مستلم ومسجل، وليس كامل الرصيد. يُسجّل الخروج في يوم مصر الحالي:{" "}
-        {formatDay(today)}، داخل أيام الحجز المخططة.
-      </p>
+
       {!hasDeposit && (
         <p className="rounded-xl bg-secondary p-4 text-xs leading-7">
           سجّل المقدم المستلم أولًا من نموذج الدفعات. لا يوجد حد مالي مفترض
@@ -150,6 +147,7 @@ function ReturnForm({
   );
   const [issues, setIssues] = useState<string[]>([]);
   const [card, setCard] = useState(false);
+  const [settleRemaining, setSettleRemaining] = useState(false);
   const [state, action, pending] = useWorkflowAction(
     recordBookingReturn,
     onSuccess,
@@ -164,20 +162,31 @@ function ReturnForm({
       <input type="hidden" name="booking_id" value={bookingId} />
       <input type="hidden" name="expected_day" value={today} />
       <h3 className="text-base">استلام الفستان من العميل وفحصه</h3>
-      <p className="text-xs leading-7 text-muted-foreground">
-        يُسجّل يوم الاستلام الحالي {formatDay(today)} دون تغيير الموعد المخطط. لا
-        صور للفحص، ولا أوامر إصلاح أو تقدير تكلفة.
-      </p>
+
       <div
-        className={`rounded-xl border p-4 text-xs leading-7 ${settled ? "bg-secondary" : "border-red-200 bg-red-50 text-red-900"}`}
+        className={`rounded-xl border p-4 text-xs leading-7 ${settled ? "bg-secondary" : "border-amber-200 bg-amber-50/80 text-amber-950"}`}
       >
-        المتبقي حسب السجل:{" "}
-        {BigInt(remaining) >= BigInt(0)
-          ? aggregateMoney(remaining)
-          : "خطأ في تسوية السجل، راجع الأدمن"}
-        .{" "}
-        {!settled &&
-          "لا يمكن إتمام العودة أو إغلاقها قبل تسجيل سداد المتبقي كله، بما فيه أي غرامة أضافها الأدمن."}
+        <p className="font-semibold text-sm">
+          المتبقي حسب السجل:{" "}
+          {BigInt(remaining) >= BigInt(0)
+            ? aggregateMoney(remaining)
+            : "خطأ في تسوية السجل، راجع الأدمن"}
+          {BigInt(remaining) > BigInt(0) ? " (شامل أي غرامة مسجلة)" : ""}.
+        </p>
+        {!settled && BigInt(remaining) > BigInt(0) && (
+          <label className="mt-3 flex items-start gap-3 cursor-pointer pt-2 border-t border-amber-200/80">
+            <input
+              type="checkbox"
+              name="settle_remaining"
+              className="mt-1 size-4 accent-primary"
+              checked={settleRemaining}
+              onChange={(e) => setSettleRemaining(e.target.checked)}
+            />
+            <span className="leading-6">
+              استلمت كامل المبلغ المتبقي الآن (<strong>{aggregateMoney(remaining)}</strong> نقداً أو بالتحويل)، وسجّله كدفعة نهائية تلقائياً مع تأكيد العودة.
+            </span>
+          </label>
+        )}
       </div>
       <fieldset disabled={pending} className="space-y-5">
         <label className="field">
@@ -240,12 +249,16 @@ function ReturnForm({
           disabled={
             preview ||
             !enabled ||
-            !settled ||
+            (!settled && !settleRemaining) ||
             pending ||
             (inspection === "maintenance" && issues.length === 0)
           }
         >
-          {pending ? "جارٍ تأكيد العودة…" : "تأكيد العودة والفحص ورد الضمان"}
+          {pending
+            ? "جارٍ تأكيد العودة…"
+            : !settled && settleRemaining
+              ? `سداد المتبقي (${aggregateMoney(remaining)}) وتأكيد العودة`
+              : "تأكيد العودة والفحص ورد الضمان"}
         </Button>
       </fieldset>
     </form>
@@ -345,16 +358,6 @@ export function BookingWorkflow({
   return (
     <section className="studio-card space-y-6 p-6 md:p-8">
       <h2 className="text-lg">التسليم والعودة والضمان</h2>
-      <p className="text-xs leading-7 text-muted-foreground">
-        ضمان بالحالة فقط. لا رقم أو صورة بطاقة، ولا مرفقات. اليوم حسب مصر{" "}
-        {formatDay(data.today)}.
-      </p>
-      {!operationalAccess && (
-        <p className="rounded-xl border bg-secondary p-4 text-xs leading-8">
-          يمكنك مشاهدة هذا الحجز وتسجيل المقدم أو الباقي المستلم. التسليم
-          والعودة وتأكيد التجهيز للحجز الذي أنشأته أو أُسند إليك، أو للأدمن.
-        </p>
-      )}
       {!enabled && (
         <p className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
           الحفظ غير متاح في هذه الصفحة أو قبل اكتمال إعداد الخدمة. الحقول
@@ -369,108 +372,98 @@ export function BookingWorkflow({
           {success}
         </p>
       )}
-      <div className="grid gap-4 text-xs leading-7 sm:grid-cols-2">
-        <div className="rounded-xl border bg-white p-4">
-          <p className="mb-2 text-muted-foreground">التسليم واستلام الضمان</p>
-          {data.handover ? (
-            <p>
-              خروج مسجل {formatDay(data.handover.handed_over_on)}. استلام الضمان
-              مؤكد بالحالة فقط.
-            </p>
-          ) : (
-            <p>
-              لا يوجد سجل تسليم من هذه النسخة. لا تُفترض حالة استلام الضمان من
-              حالة الحجز وحدها.
-            </p>
-          )}
-        </div>
-        <div className="rounded-xl border bg-white p-4">
-          <p className="mb-2 text-muted-foreground">العودة ورد الضمان</p>
-          {data.return ? (
-            <>
-              <p>
-                استلام مسجل {formatDay(data.return.returned_on)}. رد الضمان
-                مؤكد. الفحص:{" "}
-                {data.return.inspection === "sound" ? "سليم" : "يحتاج صيانة"}.
-              </p>
-              {data.return.issues.length > 0 && (
-                <p>
-                  {data.return.issues
-                    .map(
-                      (i) =>
-                        inspectionLabels[i as keyof typeof inspectionLabels],
-                    )
-                    .join("، ")}
-                </p>
+      {status === "returned" ? (
+        preview ? (
+          <>
+            <p className="text-xs leading-7">
+              حالة الفستان الحالية:{" "}
+              {data.operation
+                ? (operationLabels[data.operation] ?? data.operation)
+                : "لم تُسجّل حالة تشغيل بعد"}
+              .{" "}
+              {data.ready_on && (
+                <>أول يوم بعد التجهيز المسجل: {formatDay(data.ready_on)}.</>
               )}
-              <p>
-                يوم التجهيز الكامل:{" "}
-                {formatDay(addDays(data.return.returned_on, 1))}.
+            </p>
+            {maintenanceHeld && (
+              <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-8 text-red-900">
+                الفستان يحتاج صيانة مسجلة. الأدمن وحده يؤكد انتهاء الصيانة ويعيد
+                الجاهزية بعد يوم التجهيز. لا حجز جديد أو تغيير موعد أو تسليم قبل ذلك،
+                ولا تمسح عودة سليمة لاحقة هذا الشرط.
               </p>
-            </>
-          ) : (
-            <p>العودة ورد الضمان لم يُسجّلا بعد.</p>
+            )}
+            {data.return &&
+              (data.operation !== "in_atelier" || maintenanceHeld) && (
+                <ReadyForm
+                  bookingId={bookingId}
+                  dressId={dressId}
+                  enabled={
+                    enabled && operationalAccess && (!maintenanceHeld || admin)
+                  }
+                  today={data.today}
+                  readyOn={data.ready_on}
+                  preview={preview}
+                  onSuccess={setSuccess}
+                />
+              )}
+          </>
+        ) : (
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 p-5 text-emerald-900">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm">
+              ✓
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-emerald-950">
+                تمت عودة الفستان
+              </p>
+              <p className="text-xs text-emerald-800/80 mt-0.5">
+                تم استلام الفستان من العميل ورد الضمان، والعملية مكتملة بنجاح.
+              </p>
+            </div>
+          </div>
+        )
+      ) : (
+        <>
+          <p className="text-xs leading-7">
+            حالة الفستان الحالية:{" "}
+            {data.operation
+              ? (operationLabels[data.operation] ?? data.operation)
+              : "لم تُسجّل حالة تشغيل بعد"}
+            .{" "}
+            {data.ready_on && (
+              <>أول يوم بعد التجهيز المسجل: {formatDay(data.ready_on)}.</>
+            )}
+          </p>
+          {maintenanceHeld && (
+            <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-8 text-red-900">
+              الفستان يحتاج صيانة مسجلة. الأدمن وحده يؤكد انتهاء الصيانة ويعيد
+              الجاهزية بعد يوم التجهيز. لا حجز جديد أو تغيير موعد أو تسليم قبل ذلك،
+              ولا تمسح عودة سليمة لاحقة هذا الشرط.
+            </p>
           )}
-        </div>
-      </div>
-      <p className="text-xs leading-7">
-        حالة الفستان الحالية:{" "}
-        {data.operation
-          ? (operationLabels[data.operation] ?? data.operation)
-          : "لم تُسجّل حالة تشغيل بعد"}
-        .{" "}
-        {data.ready_on && (
-          <>أول يوم بعد التجهيز المسجل: {formatDay(data.ready_on)}.</>
-        )}
-      </p>
-      {maintenanceHeld && (
-        <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-8 text-red-900">
-          الفستان يحتاج صيانة مسجلة. الأدمن وحده يؤكد انتهاء الصيانة ويعيد
-          الجاهزية بعد يوم التجهيز. لا حجز جديد أو تغيير موعد أو تسليم قبل ذلك،
-          ولا تمسح عودة سليمة لاحقة هذا الشرط.
-        </p>
+          {status === "confirmed" && (
+            <HandoverForm
+              bookingId={bookingId}
+              enabled={enabled && operationalAccess && !maintenanceHeld}
+              today={data.today}
+              inDays={handoverInPlannedDays(data.today, startsOn, returnsOn)}
+              hasDeposit={BigInt(paid) > BigInt(0)}
+              preview={preview}
+              onSuccess={setSuccess}
+            />
+          )}
+          {status === "out" && (
+            <ReturnForm
+              bookingId={bookingId}
+              enabled={enabled && operationalAccess}
+              remaining={remaining}
+              today={data.today}
+              preview={preview}
+              onSuccess={setSuccess}
+            />
+          )}
+        </>
       )}
-      {status === "confirmed" && (
-        <HandoverForm
-          bookingId={bookingId}
-          enabled={enabled && operationalAccess && !maintenanceHeld}
-          today={data.today}
-          inDays={handoverInPlannedDays(data.today, startsOn, returnsOn)}
-          hasDeposit={BigInt(paid) > BigInt(0)}
-          preview={preview}
-          onSuccess={setSuccess}
-        />
-      )}{" "}
-      {status === "out" && (
-        <ReturnForm
-          bookingId={bookingId}
-          enabled={enabled && operationalAccess}
-          remaining={remaining}
-          today={data.today}
-          preview={preview}
-          onSuccess={setSuccess}
-        />
-      )}{" "}
-      {status === "returned" &&
-        data.return &&
-        (data.operation !== "in_atelier" || maintenanceHeld) && (
-          <ReadyForm
-            bookingId={bookingId}
-            dressId={dressId}
-            enabled={
-              enabled && operationalAccess && (!maintenanceHeld || admin)
-            }
-            today={data.today}
-            readyOn={data.ready_on}
-            preview={preview}
-            onSuccess={setSuccess}
-          />
-        )}
-      <p className="border-t pt-5 text-xs leading-7 text-muted-foreground">
-        تنبيه التعارض للأدمن مهم لكنه لا يفرض حظر تسليم آليًا، ولا يلغي أو يحرك
-        حجزًا. الصيانة المسجلة شرط مستقل لا يرفعه إلا الأدمن. إنشاء حجز جديد يظل
-        ملتزمًا بيوم التجهيز الكامل بعد يوم الاستلام المسجل.
-      </p>
     </section>
   );
 }

@@ -1,4 +1,8 @@
-import { bookingNumber } from "@/lib/presentation";
+import {
+  bookingNumber,
+  displayCustomerName,
+  displayCustomerPhone,
+} from "@/lib/presentation";
 import { BookingEditPanel } from "@/components/atelier/booking-edit-panel";
 import { CancellationPanel } from "@/components/atelier/cancellation-panel";
 import { BookingWorkflow } from "@/components/atelier/booking-workflow";
@@ -136,26 +140,18 @@ export default async function BookingDetails({
       <section className="studio-card grid gap-6 p-6 text-xs md:grid-cols-3">
         <div>
           <p className="mb-3 text-muted-foreground">العميل</p>
-          {profile.role === "admin" ? (
-            <Link
-              href={`/workspace/customers/${b.customer_id}`}
-              className="underline underline-offset-4"
-            >
-              {bookingNumber(b.id)
-                ? `عملية ${bookingNumber(b.id)}`
-                : (customer?.full_name ?? "غير متاح")}
-            </Link>
-          ) : (
-            <p>
-              {bookingNumber(b.id)
-                ? `عملية ${bookingNumber(b.id)}`
-                : (customer?.full_name ?? "غير متاح")}
-            </p>
-          )}
+          <Link
+            href={`/workspace/customers/${b.customer_id}`}
+            className="underline underline-offset-4"
+          >
+            {bookingNumber(b.id)
+              ? `عملية ${bookingNumber(b.id)}`
+              : displayCustomerName(customer?.full_name)}
+          </Link>
           <p dir="ltr" className="mt-3 text-right">
             {bookingNumber(b.id) && /^0{10}[1-5]$/.test(customer?.phone ?? "")
               ? null
-              : customer?.phone}
+              : displayCustomerPhone(customer?.phone)}
           </p>
         </div>
         <div>
@@ -200,6 +196,7 @@ export default async function BookingDetails({
       )}
       {!paymentError && !feeError && (
         <LivePaymentForm
+          key={`payment-${b.id}-${remaining.toString()}`}
           bookingId={b.id}
           requestId={crypto.randomUUID()}
           methods={config?.payment_methods ?? []}
@@ -207,6 +204,8 @@ export default async function BookingDetails({
           defaultAmount={
             receiptContext === "return_balance" ? amountDefault : undefined
           }
+          feeTotal={feeTotal.toString()}
+          remainingAmount={remaining.toString()}
           enabled={
             bookingConfigReady(config) &&
             config?.receipt_timing_ready === true &&

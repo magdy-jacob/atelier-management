@@ -88,7 +88,7 @@ function EditForm({
           />
         </label>
         <label className="field">
-          العودة المخططة الجديدة
+          الاستلام الجديدة
           <input
             type="date"
             name="returns_on"
@@ -114,12 +114,7 @@ function EditForm({
           />
         </label>
       </div>
-      {validDay(start) && validDay(end) && (
-        <p className="rounded-xl bg-secondary/50 p-4 text-xs leading-8">
-          الموعد المدخل بالأيام: {formatDay(start)} إلى {formatDay(end)}. يبقى
-          اليوم التالي للعودة للتجهيز كاملًا.
-        </p>
-      )}
+
       <label className="field">
         سبب تعديل الحجز
         <textarea
@@ -193,13 +188,6 @@ export function BookingEditPanel({
         </p>
       ) : (
         <>
-          <p className="text-xs leading-8 text-muted-foreground">
-            قبل تسليم الفستان فقط، بسبب محفوظ. المقبوض المسجل الآن{" "}
-            {aggregateMoney(paid)}، ولا ينزل السعر الجديد عن المقبوض. يُمنع
-            التعارض ويظل يوم التجهيز كاملًا بعد العودة. عند تغيير التواريخ تبدأ
-            من الغد على الأقل حسب مصر؛ تعديل السعر وحده يمكنه إبقاء الموعد
-            الحالي.
-          </p>
           {preview && (
             <p className="rounded-xl bg-secondary p-4 text-xs leading-8">
               معاينة مصطنعة لا تحفظ. التعديل الحقيقي من تفاصيل حجز مساحة العمل
@@ -227,47 +215,6 @@ export function BookingEditPanel({
               )}
             </>
           )}
-          <div className="space-y-4 border-t pt-6">
-            <h3 className="text-sm">تاريخ تعديل الحجز، للأدمن</h3>
-            <p className="text-xs leading-7 text-muted-foreground">
-              آخر ١٠٠ تعديل لهذا الحجز. لا تُحذف الدفعات أو يُعاد تأريخها بسبب
-              تغيير السعر أو الموعد.
-            </p>
-            {!history.length && (
-              <p className="text-xs text-muted-foreground">
-                لا توجد تعديلات مسجلة في هذه القائمة.
-              </p>
-            )}
-            {history.map((h) => (
-              <article
-                key={h.id}
-                className="space-y-3 rounded-xl border p-4 text-xs leading-8"
-              >
-                <p className="font-medium">
-                  {h.actor_name ?? "حساب أدمن مسجل"} ·{" "}
-                  {new Intl.DateTimeFormat("ar-EG", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                    timeZone: "Africa/Cairo",
-                  }).format(new Date(h.created_at))}{" "}
-                  بتوقيت القاهرة
-                </p>
-                <p>
-                  الموعد السابق: {formatDay(h.old_start)} إلى{" "}
-                  {formatDay(h.old_return)}.
-                </p>
-                <p>
-                  الموعد المحفوظ: {formatDay(h.new_start)} إلى{" "}
-                  {formatDay(h.new_return)}.
-                </p>
-                <p>
-                  السعر: {aggregateMoney(h.old_price_piasters)} ←{" "}
-                  {aggregateMoney(h.new_price_piasters)}.
-                </p>
-                <p className="break-words">السبب: {h.reason}</p>
-              </article>
-            ))}
-          </div>
         </>
       )}
     </section>

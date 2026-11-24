@@ -85,7 +85,6 @@ export default async function Operations({
   return (
     <StaffFrame
       title="العمليات والتقويم"
-      description="مواعيد من قاعدة البيانات ضمن صلاحيات حسابك. اليوم محسوب بتوقيت مصر، والأحداث بالأيام فقط. التنبيهات هنا مشتقة من الحالات المسجلة وليست سجل إشعارات مقروءة أو إثبات تسليم."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/operations"

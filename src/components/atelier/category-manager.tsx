@@ -38,8 +38,7 @@ function CategoryItem({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base">{c.name}</h2>
         <p className="text-xs text-muted-foreground">
-          {c.dressCount.toLocaleString("ar-EG")} فستان مرتبط، يشمل المؤرشف ·
-          نسخة {c.version}
+          {c.dressCount.toLocaleString("ar-EG")} فستان مرتبط، يشمل المؤرشف
         </p>
       </div>
       <form

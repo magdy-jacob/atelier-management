@@ -43,7 +43,6 @@ export default async function Dashboard({
   return (
     <StaffFrame
       title="لوحة الأدمن"
-      description="تابع المبالغ المستلمة والمتبقيات ومؤشرات الأتيليه. اختر فترة بالأيام حتى ٣٦٦ يومًا."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/dashboard"

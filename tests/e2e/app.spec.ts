@@ -868,7 +868,9 @@ test("team preview protects admin role, labels synthetic creation and preserves 
   await expect(
     page.getByRole("button", { name: "تحقق وأكمل الربط فقط" }),
   ).toBeDisabled();
-  await expect(page.locator("body")).not.toContainText(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i);
+  await expect(page.locator("body")).not.toContainText(
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i,
+  );
   await page
     .getByLabel("البريد الإلكتروني", { exact: true })
     .fill("test-browser@example.invalid");
@@ -927,7 +929,7 @@ test("admin booking-edit preview retains inputs, shows history and closes editin
     page.getByRole("button", { name: "حفظ تعديل الموعد والسعر" }),
   ).toBeDisabled();
   await page.getByLabel("بداية الحجز الجديدة").fill("2026-12-10");
-  await page.getByLabel("العودة المخططة الجديدة").fill("2026-12-11");
+  await page.getByLabel("الاستلام الجديدة").fill("2026-12-11");
   await page.getByLabel("السعر المتفق عليه بالجنيه").fill("150.25");
   await page.getByLabel("سبب تعديل الحجز").fill("اختبار تعديل محتفظ بقيمه");
   await page.locator('[name="confirm"]').check();

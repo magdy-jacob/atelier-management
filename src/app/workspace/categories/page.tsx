@@ -28,7 +28,6 @@ export default async function Categories() {
   return (
     <StaffFrame
       title="إدارة التصنيفات"
-      description="للأدمن فقط. عدّل الاسم أو احذف تصنيفًا غير مرتبط بأي فستان. تغيير الاسم يظهر على الفساتين التابعة له؛ لا تُغيّر هذه الشاشة سياسة إتاحة الكتالوج."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/categories"

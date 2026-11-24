@@ -7,7 +7,11 @@ import {
 } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { SYNTHETIC_PHONE_PATTERN } from "@/lib/booking-identity";
-import { money, toPiasters } from "@/lib/domain";
+import { money, toPiasters, addDays, dateInZone } from "@/lib/domain";
+import {
+  BookingCalendarPicker,
+  type BookingRange,
+} from "./booking-calendar-picker";
 function Feedback({ state }: { state: ActionState }) {
   return (
     <>
@@ -38,6 +42,7 @@ export function LiveBookingForm({
   minDay,
   preview = false,
   synthetic = false,
+  existingBookings = [],
 }: {
   dresses: { id: string; name: string; code: string }[];
   methods: string[];
@@ -46,16 +51,106 @@ export function LiveBookingForm({
   minDay?: string;
   preview?: boolean;
   synthetic?: boolean;
+  existingBookings?: BookingRange[];
 }) {
   const [state, action, pending] = useActionState(createRealBooking, {});
   const [total, setTotal] = useState("");
   const [deposit, setDeposit] = useState("0");
+  const [selectedDressId, setSelectedDressId] = useState(dresses[0]?.id ?? "");
+  const [startsOn, setStartsOn] = useState("");
+  const [returnsOn, setReturnsOn] = useState("");
+  const [dateValidationWarning, setDateValidationWarning] = useState<
+    string | null
+  >(null);
+
+  const todayCairo = dateInZone(new Date(), "Africa/Cairo");
+  const effectiveMinDay =
+    minDay && minDay > todayCairo ? minDay : addDays(todayCairo, 1);
+
   let remaining: string = "—";
   try {
     const a = toPiasters(total),
       b = toPiasters(deposit);
     remaining = b <= a ? money(a - b) : "المقدم يتجاوز السعر";
   } catch {}
+
+  const handleStartDateChange = (val: string) => {
+    if (!val) {
+      setStartsOn("");
+      return;
+    }
+    if (val < effectiveMinDay) {
+      setDateValidationWarning(
+        "لا يمكن حجز الفستان في نفس اليوم أو في تاريخ ماضٍ. أقرب موعد متاح هو غدًا: " +
+          effectiveMinDay,
+      );
+      setStartsOn("");
+      return;
+    }
+    const isBooked = existingBookings.some(
+      (b) =>
+        b.dress_id === selectedDressId &&
+        val >= b.starts_on &&
+        val <= addDays(b.returns_on, 1),
+    );
+    if (isBooked) {
+      setDateValidationWarning(
+        "هذا اليوم محجوز بالفعل لهذا الفستان أو يوافق يوم تجهيز. اختر يومًا متاحًا.",
+      );
+      setStartsOn("");
+      return;
+    }
+    setDateValidationWarning(null);
+    setStartsOn(val);
+    if (returnsOn && returnsOn < val) {
+      setReturnsOn("");
+    }
+  };
+
+  const handleReturnDateChange = (val: string) => {
+    if (!val) {
+      setReturnsOn("");
+      return;
+    }
+    if (val < effectiveMinDay) {
+      setDateValidationWarning("تاريخ العودة غير صحيح.");
+      setReturnsOn("");
+      return;
+    }
+    if (startsOn && val < startsOn) {
+      setDateValidationWarning(
+        "تاريخ العودة لا يمكن أن يكون قبل تاريخ الخروج.",
+      );
+      setReturnsOn("");
+      return;
+    }
+    const startCheck = startsOn || val;
+    let cur = startCheck;
+    let conflict = false;
+    while (cur <= val) {
+      const isOcc = existingBookings.some(
+        (b) =>
+          b.dress_id === selectedDressId &&
+          cur >= b.starts_on &&
+          cur <= addDays(b.returns_on, 1),
+      );
+      if (isOcc) {
+        conflict = true;
+        break;
+      }
+      cur = addDays(cur, 1);
+    }
+    if (conflict) {
+      setDateValidationWarning(
+        "الفترة المحددة تتعارض مع حجز قائم لهذا الفستان أو مع يوم التجهيز.",
+      );
+      setReturnsOn("");
+      return;
+    }
+    setDateValidationWarning(null);
+    setReturnsOn(val);
+  };
+
   return (
     <form
       action={preview ? undefined : action}
@@ -75,7 +170,17 @@ export function LiveBookingForm({
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="field sm:col-span-2">
           الفستان
-          <select name="dress_id" required defaultValue="">
+          <select
+            name="dress_id"
+            required
+            value={selectedDressId}
+            onChange={(e) => {
+              setSelectedDressId(e.target.value);
+              setStartsOn("");
+              setReturnsOn("");
+              setDateValidationWarning(null);
+            }}
+          >
             <option value="" disabled>
               اختر الفستان
             </option>
@@ -86,41 +191,73 @@ export function LiveBookingForm({
             ))}
           </select>
         </label>
+
+        {/* Visual calendar showing booked & preparation days as locked */}
+        <div className="sm:col-span-2 space-y-2">
+          <BookingCalendarPicker
+            selectedDressId={selectedDressId}
+            existingBookings={existingBookings}
+            startsOn={startsOn}
+            returnsOn={returnsOn}
+            onSelectRange={(start, end) => {
+              setStartsOn(start);
+              setReturnsOn(end);
+              setDateValidationWarning(null);
+            }}
+            minDay={effectiveMinDay}
+          />
+          {dateValidationWarning && (
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 leading-6"
+            >
+              {dateValidationWarning}
+            </p>
+          )}
+        </div>
+
+        <label className="field">
+          التسليم
+          <input
+            name="starts_on"
+            type="date"
+            required
+            min={effectiveMinDay}
+            value={startsOn}
+            onChange={(e) => handleStartDateChange(e.target.value)}
+          />
+        </label>
+        <label className="field">
+          الاستلام
+          <input
+            name="returns_on"
+            type="date"
+            required
+            min={startsOn || effectiveMinDay}
+            value={returnsOn}
+            onChange={(e) => handleReturnDateChange(e.target.value)}
+          />
+        </label>
         <label className="field">
           اسم العميل
           <input
             name="customer"
             required
             maxLength={120}
-            defaultValue={synthetic ? "اختبار عميلة جديدة" : undefined}
-            pattern={synthetic ? "اختبار .+" : undefined}
+            placeholder="اسم العميل (عربي أو إنجليزي)"
           />
-          {synthetic && (
-            <span className="text-[10px] leading-6">
-              صيغة الاسم لهذا الحساب تبدأ بكلمة «اختبار».
-            </span>
-          )}
         </label>
         <label className="field">
           رقم الهاتف
           <input
             name="phone"
-            type={synthetic ? "text" : "tel"}
-            defaultValue={synthetic ? "TEST-001" : undefined}
-            pattern={synthetic ? SYNTHETIC_PHONE_PATTERN : undefined}
+            type="tel"
+            placeholder="مثال: 012 861xxxxx"
             dir="ltr"
             required
             minLength={5}
             maxLength={24}
           />
-        </label>
-        <label className="field">
-          الخروج المخطط
-          <input name="starts_on" type="date" required min={minDay} />
-        </label>
-        <label className="field">
-          العودة المخططة
-          <input name="returns_on" type="date" required min={minDay} />
         </label>
         <label className="field">
           السعر النهائي المتفق عليه (جنيه)
@@ -212,6 +349,8 @@ export function LivePaymentForm({
   preview = false,
   context = "return_balance",
   defaultAmount,
+  feeTotal = "0",
+  remainingAmount,
 }: {
   bookingId: string;
   methods: string[];
@@ -220,12 +359,15 @@ export function LivePaymentForm({
   preview?: boolean;
   context?: "deposit" | "return_balance" | null;
   defaultAmount?: string;
+  feeTotal?: string;
+  remainingAmount?: string;
 }) {
   const [state, action, pending] = useActionState(
     recordRealPayment,
     {} as ActionState,
   );
   if (!context) return null;
+  const hasFee = Number(feeTotal) > 0;
   return (
     <section className="studio-card p-6">
       <h2 className="mb-3 text-base">
@@ -237,6 +379,19 @@ export function LivePaymentForm({
           : "يستخدم فقط عند عودة العميلة بالفستان فعلًا، لا لدفع الرصيد مقدمًا. يبقى إتمام العودة مشروطًا بسداد المتبقي كله."}{" "}
         لا تحصيل إلكتروني.
       </p>
+      {context === "return_balance" && hasFee && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-950">
+          <p className="font-semibold text-sm mb-1">
+            توضيح المتبقي المطلوب سداده:
+          </p>
+          <p>
+            المبلغ المقترح أدناه (<strong>{defaultAmount} ج.م</strong>) هو <strong>كامل المبلغ المتبقي المستحق شاملاً الغرامة المسجلة ({money(Number(feeTotal))})</strong>.
+          </p>
+          <p className="text-[11px] text-amber-800/90 mt-1 font-medium">
+            ⚠️ لا تقم بإضافة مبلغ الغرامة يدوياً مرة أخرى، منعاً لظهور رسالة «المبلغ يتجاوز المستحق».
+          </p>
+        </div>
+      )}
       {!enabled && (
         <p className="mb-5 rounded-xl border border-pink-200 bg-pink-50 p-4 text-xs leading-7">
           التسجيل متوقف لحين إتمام اختبارات الربط وتفعيل الحفظ، أو لأن حالة

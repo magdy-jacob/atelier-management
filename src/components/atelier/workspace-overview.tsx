@@ -33,8 +33,10 @@ const statuses: Record<string, string> = {
 };
 export function WorkspaceBookingTable({
   bookings,
+  emptyMessage = "لا توجد حجوزات في القائمة.",
 }: {
   bookings: WorkspaceBooking[];
+  emptyMessage?: string;
 }) {
   return (
     <div className="divide-y">
@@ -78,7 +80,11 @@ export function WorkspaceBookingTable({
               className={
                 b.status === "out"
                   ? "border-pink-100 bg-pink-50 text-primary"
-                  : "border-transparent bg-secondary text-primary"
+                  : b.status === "returned"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : b.status === "cancelled"
+                      ? "border-slate-200 bg-slate-100 text-slate-600"
+                      : "border-transparent bg-secondary text-primary"
               }
             >
               {statuses[b.status] ?? b.status}
@@ -97,7 +103,7 @@ export function WorkspaceBookingTable({
       ))}
       {!bookings.length && (
         <p className="p-10 text-center text-xs text-muted-foreground">
-          لا توجد حجوزات في القائمة.
+          {emptyMessage}
         </p>
       )}
     </div>

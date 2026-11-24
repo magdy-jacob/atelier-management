@@ -4,6 +4,7 @@ import { getBookingConfig, bookingConfigReady } from "@/lib/booking-config";
 import { StaffFrame, Unavailable } from "@/components/atelier/staff-frame";
 import { LiveBookingForm } from "@/components/atelier/live-booking-forms";
 import { addDays, dateInZone } from "@/lib/domain";
+
 export default async function NewBooking() {
   const { db, profile } = await requireStaff();
   const [config, { data: dresses, error }] = await Promise.all([
@@ -14,15 +15,18 @@ export default async function NewBooking() {
       .eq("archived", false)
       .order("name"),
   ]);
-  let minDay: string | undefined;
-  try {
-    if (config?.business_timezone) {
-      minDay = addDays(
-        dateInZone(new Date(), config.business_timezone),
-        config.same_day_allowed ? 0 : 1,
-      );
-    }
-  } catch {}
+
+  const tz = config?.business_timezone || "Africa/Cairo";
+  const today = dateInZone(new Date(), tz);
+  // Strictly prevent same-day bookings: earliest start is tomorrow
+  const minDay = addDays(today, 1);
+
+  // Fetch active/non-cancelled bookings to know occupied dates for each dress
+  const { data: existingBookings } = await db
+    .from("bookings")
+    .select("dress_id,starts_on,returns_on")
+    .neq("status", "cancelled");
+
   return (
     <StaffFrame
       title="حجز جديد"
@@ -41,6 +45,7 @@ export default async function NewBooking() {
           requestId={crypto.randomUUID()}
           minDay={minDay}
           synthetic={config?.synthetic_test_enabled === true}
+          existingBookings={existingBookings ?? []}
         />
       )}
     </StaffFrame>

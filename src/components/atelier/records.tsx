@@ -259,10 +259,6 @@ export function BookingLedger({
             </p>
           )}
         </div>
-        <p className="mt-5 text-[10px] leading-7 text-muted-foreground">
-          هذه مبالغ مسجلة في النظام، وليست إثباتًا مستقلًا لوصول تحويل بنكي أو
-          تحصيل إلكتروني. لا توجد أزرار دفع أو استرداد هنا.
-        </p>
       </section>
     </div>
   );

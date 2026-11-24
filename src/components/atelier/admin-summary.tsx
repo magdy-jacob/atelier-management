@@ -57,10 +57,7 @@ export function AdminSummary({
         aria-label="حالات عرض الكتالوج"
       >
         <h2 className="text-lg">حالات عرض الكتالوج، فساتين غير مؤرشفة</h2>
-        <p className="text-xs leading-8 text-muted-foreground">
-          هذه أعداد التسميات اليدوية للكتالوج، لا حالة الصيانة أو خروج الفستان،
-          ولا ضمان توفره في تاريخ معين. منفصلة عن الفترة المالية المختارة.
-        </p>
+
         <div className="grid gap-4 sm:grid-cols-3">
           {[
             ["متاح للعرض", data.public_available_dresses],
@@ -112,7 +109,6 @@ export function AdminSummary({
           ))}
         </div>
       </section>
-
     </div>
   );
 }

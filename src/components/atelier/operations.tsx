@@ -188,10 +188,6 @@ export function OperationsBoard({
             تجاوز العودة وهو مسجل خارج الأتيليه
           </span>
         </div>
-        <p className="mb-4 text-[11px] leading-6 text-muted-foreground">
-          عرض الشهر يضم العودة ويوم التجهيز التالي. الحجوزات الملغاة مستبعدة. لا
-          يظهر سعر أو هاتف عميل في التقويم.
-        </p>
         <div className="hidden grid-cols-7 gap-2 pb-3 text-center text-xs md:grid">
           {[
             "السبت",
@@ -249,9 +245,7 @@ export function OperationsBoard({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[10px] leading-5 text-muted-foreground">
-                    لا مواعيد في البيانات المعروضة
-                  </p>
+                  <p></p>
                 )}
               </article>
             );

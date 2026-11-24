@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { getBookingConfig, bookingConfigReady } from "@/lib/booking-config";
 import Link from "next/link";
 import { requireStaff } from "@/lib/supabase/auth";
@@ -50,14 +51,27 @@ export async function NotificationsPage({
       </StaffFrame>
     );
   const config = await getBookingConfig(db);
+  const cookieStore = await cookies();
+  const unmarked = new Set(
+    (cookieStore.get("unmarked_notifications")?.value ?? "")
+      .split(",")
+      .filter(Boolean),
+  );
+
   const { data, error } = await db.rpc("get_admin_notifications", {
     p_kind: filter ?? null,
   });
   const parsed = !error ? notificationResultSchema.safeParse(data) : null;
+  const items = (parsed?.data?.items ?? []).map((item) => {
+    const key = `${item.kind}:${item.booking_id}:${item.event_on}`;
+    if (unmarked.has(key)) {
+      return { ...item, read_at: null };
+    }
+    return item;
+  });
   return (
     <StaffFrame
       title="مركز الإشعارات"
-      description="إشعارات داخل الموقع فقط للأدمن. حالة القراءة محفوظة لكل حساب، ولا تحذف التنبيه التشغيلي ما دام سببه قائمًا. لا بريد أو WhatsApp أو Push."
       name={profile.full_name}
       role={profile.role}
       active="/workspace/notifications"
@@ -66,7 +80,7 @@ export async function NotificationsPage({
 
       {parsed?.success ? (
         <NotificationList
-          items={parsed.data.items}
+          items={items}
           total={parsed.data.total}
           mutationsEnabled={bookingConfigReady(config)}
         />

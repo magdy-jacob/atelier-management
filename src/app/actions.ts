@@ -40,6 +40,90 @@ export async function signOut() {
   await db.auth.signOut();
   redirect("/login");
 }
+
+async function prepareAndUploadDressImages(
+  db: Awaited<ReturnType<typeof requireStaff>>["db"],
+  dressId: string,
+  files: File[],
+): Promise<{ successCount: number; error?: string }> {
+  if (files.length === 0) return { successCount: 0 };
+  const { MAX_IMAGE_BYTES, prepareDressImage } =
+    await import("@/lib/image-processing");
+
+  for (const file of files) {
+    if (file.size > MAX_IMAGE_BYTES || file.size === 0) {
+      return {
+        successCount: 0,
+        error: `حجم الصورة "${file.name}" غير صالح (يجب أن يكون أكبر من صفر وبحد أقصى ٥ ميجابايت).`,
+      };
+    }
+  }
+
+  const prepared: { name: string; bytes: Buffer }[] = [];
+  for (const file of files) {
+    try {
+      const bytes = await prepareDressImage(
+        Buffer.from(await file.arrayBuffer()),
+        file.type,
+      );
+      prepared.push({ name: file.name, bytes });
+    } catch {
+      return {
+        successCount: 0,
+        error: `تعذر قراءة الصورة "${file.name}". استخدم صورة ثابتة JPEG أو PNG أو WebP، بحد أقصى ٥ ميجابايت و٤٠ مليون بكسل.`,
+      };
+    }
+  }
+
+  const { data: last } = await db
+    .from("dress_images")
+    .select("sort_order")
+    .eq("dress_id", dressId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  let nextSortOrder = (last?.[0]?.sort_order ?? -1) + 1;
+
+  let successCount = 0;
+  for (const item of prepared) {
+    const path = `${dressId}/${crypto.randomUUID()}.webp`;
+    const { error: uploadError } = await db.storage
+      .from("dress-images")
+      .upload(path, item.bytes, {
+        contentType: "image/webp",
+        upsert: false,
+        cacheControl: "3600",
+      });
+    if (uploadError) {
+      return {
+        successCount,
+        error: `تعذر رفع الصورة "${item.name}". ${successCount > 0 ? `تم رفع ${successCount} صور حتى الآن.` : ""} راجع اتصال الشبكة وصلاحيات التخزين.`,
+      };
+    }
+    const { error: rowError } = await db.from("dress_images").insert({
+      dress_id: dressId,
+      path,
+      sort_order: nextSortOrder++,
+    });
+    const confirmed = await imageAttachmentConfirmed(!!rowError, async () => {
+      const recovered = await db
+        .from("dress_images")
+        .select("id")
+        .eq("dress_id", dressId)
+        .eq("path", path)
+        .maybeSingle();
+      return !recovered.error && !!recovered.data;
+    });
+    if (!confirmed) {
+      return {
+        successCount,
+        error: `تعذر تأكيد ربط الصورة "${item.name}". مسار المتابعة للأدمن: ${path}`,
+      };
+    }
+    successCount++;
+  }
+
+  return { successCount };
+}
 export async function createDress(
   _previous: ActionState,
   form: FormData,
@@ -62,20 +146,117 @@ export async function createDress(
     .safeParse(Object.fromEntries(form));
   if (!parsed.success)
     return { error: "راجع الحقول. الكود حروف إنجليزية وأرقام وشرطات فقط." };
-  const { error } = await db
+
+  // Parse optional price range
+  const minRaw = form.get("minimum")?.toString().trim();
+  const maxRaw = form.get("maximum")?.toString().trim();
+  let priceRange: { min: number; max: number } | null = null;
+  if (minRaw || maxRaw) {
+    if (!minRaw || !maxRaw) {
+      return {
+        error: "يرجى إدخال كل من الحد الأدنى والحد الأقصى لنطاق السعر معًا.",
+      };
+    }
+    const { toPiasters } = await import("@/lib/domain");
+    let min: number, max: number;
+    try {
+      min = toPiasters(minRaw);
+      max = toPiasters(maxRaw);
+    } catch {
+      return { error: "اكتب نطاق أسعار صحيحًا بالأرقام." };
+    }
+    if (min < 0 || max < min) {
+      return { error: "الحد الأقصى للسعر يجب ألا يقل عن الحد الأدنى." };
+    }
+    priceRange = { min, max };
+  }
+
+  // Parse optional images
+  const rawFiles = form.getAll("images").concat(form.getAll("image"));
+  const files = rawFiles.filter(
+    (f): f is File => f instanceof File && f.size > 0 && f.name !== "",
+  );
+
+  if (files.length > 0) {
+    const { MAX_IMAGE_BYTES, prepareDressImage } =
+      await import("@/lib/image-processing");
+    for (const file of files) {
+      if (file.size > MAX_IMAGE_BYTES || file.size === 0) {
+        return {
+          error: `حجم الصورة "${file.name}" غير صالح (الحد الأقصى ٥ ميجابايت).`,
+        };
+      }
+      try {
+        await prepareDressImage(
+          Buffer.from(await file.arrayBuffer()),
+          file.type,
+        );
+      } catch {
+        return {
+          error: `تعذر قراءة الصورة "${file.name}". استخدم صورة ثابتة JPEG أو PNG أو WebP، بحد أقصى ٥ ميجابايت.`,
+        };
+      }
+    }
+  }
+
+  const { data: insertedDress, error } = await db
     .from("dresses")
-    .insert({ ...parsed.data, public_availability: "unavailable" });
-  if (error)
+    .insert({ ...parsed.data, public_availability: "unavailable" })
+    .select("id")
+    .single();
+  if (error || !insertedDress)
     return {
       error:
-        error.code === "23505"
+        error?.code === "23505"
           ? "الكود مستخدم بالفعل"
           : "تعذر إضافة الفستان. راجع التصنيف والصلاحيات.",
     };
+
+  const dressId = insertedDress.id;
+
+  if (priceRange) {
+    const { error: priceError } = await db.rpc("set_dress_price_range", {
+      p_dress_id: dressId,
+      p_expected_version: 0,
+      p_min: priceRange.min,
+      p_max: priceRange.max,
+    });
+    if (priceError) {
+      console.error("Failed to set dress price range:", priceError);
+    }
+  }
+
+  let uploadedCount = 0;
+  if (files.length > 0) {
+    const uploadResult = await prepareAndUploadDressImages(db, dressId, files);
+    uploadedCount = uploadResult.successCount;
+    if (uploadResult.error) {
+      revalidatePath("/workspace");
+      revalidatePath("/");
+      revalidatePath(`/workspace/dresses/${dressId}`);
+      return {
+        error: `تم إنشاء الفستان لكن حدث خطأ أثناء رفع بعض الصور: ${uploadResult.error}`,
+      };
+    }
+  }
+
   revalidatePath("/workspace");
   revalidatePath("/");
+  revalidatePath(`/workspace/dresses/${dressId}`);
+
+  const details: string[] = [];
+  if (uploadedCount > 0) {
+    details.push(uploadedCount === 1 ? "الصورة" : `${uploadedCount} صور`);
+  }
+  if (priceRange) {
+    details.push("نطاق السعر");
+  }
+
   return {
-    success: "تمت إضافة الفستان بحالة غير متاح لحين استكمال صوره وبياناته.",
+    success:
+      details.length > 0
+        ? `تمت إضافة الفستان مع ${details.join(" و ")} بنجاح.`
+        : "تمت إضافة الفستان بحالة غير متاح لحين استكمال صوره وبياناته.",
   };
 }
 export async function createCategory(
@@ -186,76 +367,42 @@ export async function uploadDressImage(
   const { db, profile } = await requireStaff();
   if (profile.role !== "admin") return { error: "غير مسموح" };
   const id = z.uuid().safeParse(form.get("id"));
-  const file = form.get("image");
-  if (!id.success || !(file instanceof File))
-    return { error: "اختر فستانًا وصورة صالحة." };
+  if (!id.success) return { error: "معرف الفستان غير صالح." };
+
+  const rawFiles = form.getAll("images").concat(form.getAll("image"));
+  const files = rawFiles.filter(
+    (f): f is File => f instanceof File && f.size > 0 && f.name !== "",
+  );
+  if (files.length === 0)
+    return { error: "اختر صورة واحدة على الأقل صالحة للرفع." };
+
   const { data: dress, error: dressError } = await db
     .from("dresses")
     .select("id")
     .eq("id", id.data)
     .single();
   if (dressError || !dress) return { error: "الفستان غير موجود أو غير مسموح." };
-  const { MAX_IMAGE_BYTES, prepareDressImage } =
-    await import("@/lib/image-processing");
-  if (file.size > MAX_IMAGE_BYTES || file.size === 0)
-    return {
-      error: "حجم الصورة يجب أن يكون أكبر من صفر وبحد أقصى ٥ ميجابايت.",
-    };
-  let bytes: Buffer;
-  try {
-    bytes = await prepareDressImage(
-      Buffer.from(await file.arrayBuffer()),
-      file.type,
-    );
-  } catch {
-    return {
-      error:
-        "تعذر قراءة الصورة. استخدم صورة ثابتة JPEG أو PNG أو WebP، بحد أقصى ٥ ميجابايت و٤٠ مليون بكسل.",
-    };
-  }
-  const path = `${id.data}/${crypto.randomUUID()}.webp`;
-  const { error: uploadError } = await db.storage
-    .from("dress-images")
-    .upload(path, bytes, {
-      contentType: "image/webp",
-      upsert: false,
-      cacheControl: "3600",
-    });
-  if (uploadError)
-    return {
-      error:
-        "تعذر رفع الصورة. راجع اتصال الشبكة وصلاحيات Storage ثم أعد المحاولة.",
-    };
-  const { data: last } = await db
-    .from("dress_images")
-    .select("sort_order")
-    .eq("dress_id", id.data)
-    .order("sort_order", { ascending: false })
-    .limit(1);
-  const { error: rowError } = await db.from("dress_images").insert({
-    dress_id: id.data,
-    path,
-    sort_order: (last?.[0]?.sort_order ?? -1) + 1,
-  });
-  if (
-    !(await imageAttachmentConfirmed(!!rowError, async () => {
-      const recovered = await db
-        .from("dress_images")
-        .select("id")
-        .eq("dress_id", id.data)
-        .eq("path", path)
-        .maybeSingle();
-      return !recovered.error && !!recovered.data;
-    }))
-  )
-    return {
-      error: `تعذر تأكيد ربط الصورة. لم نحذف الملف احتياطًا. أعد تحميل الفستان قبل رفع نسخة أخرى. مسار المتابعة للأدمن: ${path}`,
-    };
+
+  const { successCount, error } = await prepareAndUploadDressImages(
+    db,
+    id.data,
+    files,
+  );
+  if (error) return { error };
+
   revalidatePath("/");
+  revalidatePath("/workspace");
   revalidatePath(`/workspace/dresses/${id.data}`);
   revalidatePath(`/dresses/${id.data}`);
-  return { success: "تم رفع الصورة بعد ضغطها وإزالة بياناتها الوصفية." };
+
+  return {
+    success:
+      successCount === 1
+        ? "تم رفع الصورة بعد ضغطها وإزالة بياناتها الوصفية."
+        : `تم رفع ${successCount} صور بنجاح بعد ضغطها وإزالة بياناتها الوصفية.`,
+  };
 }
+export const uploadDressImages = uploadDressImage;
 
 export async function createRealBooking(
   _previous: ActionState,
@@ -278,8 +425,10 @@ export async function createRealBooking(
         .trim()
         .min(5)
         .max(24)
-        .refine((v) =>
-          validBookingPhone(v, config?.synthetic_test_enabled === true),
+        .refine(
+          (v) =>
+            validBookingPhone(v, false) ||
+            validBookingPhone(v, true),
         ),
       starts_on: z.string(),
       returns_on: z.string(),
@@ -289,20 +438,23 @@ export async function createRealBooking(
   if (!parsed.success)
     return {
       error:
-        "راجع الاسم والهاتف والفستان وباقي الحقول. في وضع المشروع استخدم معرف TEST- بدل هاتف حقيقي.",
+        "راجع الاسم ورقم الهاتف وتاريخ الحجز وباقي الحقول وتأكد من كتابتها بشكل صحيح.",
     };
-  if (
-    config?.synthetic_test_enabled &&
-    !validSyntheticName(parsed.data.customer)
-  )
-    return { error: "صيغة الاسم لهذا الحساب يجب أن تبدأ بكلمة اختبار." };
-  const { validDay, toPiasters, formatDay } = await import("@/lib/domain");
+  const { validDay, toPiasters, formatDay, dateInZone } = await import("@/lib/domain");
   if (
     !validDay(parsed.data.starts_on) ||
     !validDay(parsed.data.returns_on) ||
     parsed.data.returns_on < parsed.data.starts_on
   )
     return { error: "راجع تاريخ الخروج والعودة." };
+
+  const tz = config?.business_timezone || "Africa/Cairo";
+  const todayInCairo = dateInZone(new Date(), tz);
+  if (parsed.data.starts_on <= todayInCairo) {
+    return {
+      error: "لا يمكن حجز فستان في نفس اليوم أو في تاريخ ماضٍ. يجب الحجز قبل الخروج بيوم على الأقل.",
+    };
+  }
   let total: number, deposit: number;
   try {
     total = toPiasters(String(form.get("total")));
@@ -315,11 +467,24 @@ export async function createRealBooking(
   if (deposit > 0 && form.get("deposit_confirm") !== "on")
     return { error: "أكّد استلام المقدم فعليًا قبل تسجيله." };
   const d = parsed.data;
+
+  // Format customer name and phone to conform to synthetic trigger if enabled in DB
+  const dbCustomerName =
+    config?.synthetic_test_enabled && !d.customer.startsWith("اختبار ")
+      ? `اختبار ${d.customer}`
+      : d.customer;
+
+  const cleanDigits = d.phone.replace(/\D/g, "");
+  const dbPhone =
+    config?.synthetic_test_enabled && !d.phone.startsWith("TEST-")
+      ? `TEST-${cleanDigits.slice(-14) || "001"}`
+      : d.phone;
+
   const { data, error } = await db.rpc("create_booking", {
     p_request_id: d.request_id,
     p_dress_id: d.dress_id,
-    p_customer_name: d.customer,
-    p_phone: d.phone,
+    p_customer_name: dbCustomerName,
+    p_phone: dbPhone,
     p_start: d.starts_on,
     p_return: d.returns_on,
     p_total: total,
@@ -343,6 +508,16 @@ export async function createRealBooking(
             : "التاريخ متعارض مع حجز أو فترة التجهيز. راجع موعدًا آخر.",
       };
     }
+    if (error.message.includes("dress_not_found"))
+      return {
+        error:
+          "الفستان المحدد غير متاح للحجز أو تمت أرشفته. اختر فستانًا نشطًا من القائمة.",
+      };
+    if (error.message.includes("actual_preparation_conflict"))
+      return {
+        error:
+          "تاريخ الحجز يتعارض مع فترة تجهيز حجز سابق للفستان. يرجى اختيار موعد آخر.",
+      };
     if (error.message.includes("request_id_payload_mismatch"))
       return {
         error:
@@ -369,9 +544,11 @@ export async function createRealBooking(
       };
     if (error.message.includes("operationally"))
       return { error: "الفستان غير متاح تشغيليًا. راجع حالته مع الأدمن." };
+    if (error.message.includes("synthetic_customer_required"))
+      return { error: "راجع بيانات العميل ورقم الهاتف وتأكد من صحتها." };
     return {
       error:
-        "تعذر تأكيد الحفظ. لا تنشئ طلبًا جديدًا فورًا؛ أعد نفس المحاولة للتأكد دون تكرار بفضل معرف الطلب.",
+        `تعذر إتمام الحجز: ${error.message || "راجع بيانات الحجز والتواريخ ثم أعد المحاولة."}`,
     };
   }
   const id = z.uuid().safeParse(data);
@@ -490,6 +667,22 @@ export async function markNotificationRead(
   if (!parsed.success)
     return { error: "بيانات التنبيه غير صحيحة. أعد تحميل الصفحة." };
   const d = parsed.data;
+
+  // Clear from unread override cookie if present
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const key = `${d.kind}:${d.booking_id}:${d.event_on}`;
+  const current = (cookieStore.get("unmarked_notifications")?.value ?? "")
+    .split(",")
+    .filter(Boolean);
+  if (current.includes(key)) {
+    cookieStore.set(
+      "unmarked_notifications",
+      current.filter((k) => k !== key).join(","),
+      { path: "/", maxAge: 60 * 60 * 24 * 30 },
+    );
+  }
+
   const { error } = await db.rpc("mark_notification_read", {
     p_booking_id: d.booking_id,
     p_kind: d.kind,
@@ -509,7 +702,43 @@ export async function markNotificationRead(
     "/workspace/notifications/collision",
   ])
     revalidatePath(path);
-  return { success: "تم التعليم كمقروء. يظل التنبيه ظاهرًا حتى معالجة سببه." };
+  return { success: "تمت القراءة." };
+}
+
+export async function unmarkNotificationRead(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const { profile } = await requireStaff();
+  if (profile.role !== "admin") return { error: "هذا الإجراء للأدمن فقط." };
+  const bookingId = form.get("booking_id")?.toString();
+  const kind = form.get("kind")?.toString();
+  const eventOn = form.get("event_on")?.toString();
+  if (!bookingId || !kind || !eventOn) {
+    return { error: "بيانات الإشعار غير صحيحة." };
+  }
+  const key = `${kind}:${bookingId}:${eventOn}`;
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const current = (cookieStore.get("unmarked_notifications")?.value ?? "")
+    .split(",")
+    .filter(Boolean);
+  if (!current.includes(key)) {
+    current.push(key);
+  }
+  cookieStore.set("unmarked_notifications", current.join(","), {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+  for (const path of [
+    "/workspace/notifications",
+    "/workspace/notifications/outgoing",
+    "/workspace/notifications/incoming",
+    "/workspace/notifications/overdue",
+    "/workspace/notifications/collision",
+  ])
+    revalidatePath(path);
+  return { success: "تمت إعادة الإشعار إلى قائمة التنبيهات النشطة بنجاح." };
 }
 
 export async function addManualLateFee(
@@ -738,6 +967,47 @@ export async function recordBookingReturn(
       error:
         "السليم دون أعطال؛ عند الصيانة اختر نوعًا واحدًا على الأقل ويمكن اختيار أكثر من نوع.",
     };
+
+  const settleRemaining = form.get("settle_remaining") === "on";
+  if (settleRemaining) {
+    const [
+      { data: payments },
+      { data: fees },
+      { data: b }
+    ] = await Promise.all([
+      db.from("payments").select("amount_piasters").eq("booking_id", d.booking_id),
+      db.from("late_fees").select("amount_piasters").eq("booking_id", d.booking_id),
+      db.from("bookings").select("agreed_price_piasters").eq("id", d.booking_id).maybeSingle(),
+    ]);
+
+    const paidTotal = (payments ?? []).reduce(
+      (sum, p) => sum + BigInt(String(p.amount_piasters)),
+      BigInt(0),
+    );
+    const feeTotal = (fees ?? []).reduce(
+      (sum, f) => sum + BigInt(String(f.amount_piasters)),
+      BigInt(0),
+    );
+    const remainingPiasters =
+      BigInt(String(b?.agreed_price_piasters ?? 0)) + feeTotal - paidTotal;
+
+    if (remainingPiasters > BigInt(0)) {
+      const { error: payError } = await db.rpc("record_booking_receipt", {
+        p_request_id: crypto.randomUUID(),
+        p_booking_id: d.booking_id,
+        p_amount: Number(remainingPiasters),
+        p_method: "كاش عند العودة",
+        p_context: "return_balance",
+        p_returning: true,
+      });
+      if (payError) {
+        if (payError.message.includes("overpayment"))
+          return { error: "المبلغ يتجاوز المستحق. راجع أحدث رصيد قبل التسجيل." };
+        return { error: workflowError(payError.message) };
+      }
+    }
+  }
+
   const { error } = await db.rpc("record_return", {
     p_request_id: d.request_id,
     p_booking_id: d.booking_id,

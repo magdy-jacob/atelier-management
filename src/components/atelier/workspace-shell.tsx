@@ -25,6 +25,7 @@ const baseLinks = [
   { href: "/workspace", label: "نظرة عامة", icon: LayoutDashboard },
   { href: "/workspace?view=dresses", label: "الفساتين", icon: Shirt },
   { href: "/workspace/bookings", label: "الحجوزات", icon: CalendarDays },
+  { href: "/workspace/customers", label: "العملاء", icon: Users },
   {
     href: "/workspace/operations",
     label: "العمليات والتقويم",
@@ -34,10 +35,8 @@ const baseLinks = [
 const adminLinks = [
   { href: "/workspace/dashboard", label: "المالية والمؤشرات", icon: Wallet },
   { href: "/workspace/notifications", label: "التنبيهات", icon: Bell },
-  { href: "/workspace/customers", label: "العملاء", icon: Users },
   { href: "/workspace/categories", label: "التصنيفات", icon: Tags },
   { href: "/workspace/team", label: "الفريق والصلاحيات", icon: UserRoundCog },
-  { href: "/workspace/activity", label: "سجل النشاط", icon: History },
 ];
 export function WorkspaceShell({
   title,

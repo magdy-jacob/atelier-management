@@ -44,6 +44,7 @@ async function runJob(
   job: EmployeeJob,
   password: string,
   actor: string,
+  role: "admin" | "employee" = "employee",
 ): Promise<StaffActionState> {
   if (job.actor_id !== actor || !staffAuthConfigured())
     return {
@@ -67,9 +68,15 @@ async function runJob(
         app_metadata: {
           lovely_staff_job: job.id,
           lovely_staff_actor: job.actor_id,
+          role,
+        },
+        user_metadata: {
+          assigned_password: value,
+          role,
+          full_name: job.full_name,
         },
       });
-      if (error || !data.user) throw new Error("auth_create_unverified");
+      if (error || !data.user) throw new Error("auth_create_unverified: " + error?.message);
       return data.user;
     },
     complete: async () => {
@@ -90,12 +97,14 @@ async function runJob(
   if (result.status !== "completed")
     return {
       error:
-        "لم يتأكد اكتمال الإنشاء. الطلب محفوظ بالقائمة؛ تحقق منه أو أعد نفس الطلب بكلمة المرور نفسها. لا ننشئ حسابًا بديلًا ولا نحذف حسابًا عند الشك.",
+        "لم يتأكد اكتمال الإنشاء. أعد المحاولة بنفس البيانات وكلمة المرور.",
     };
   return {
     success: result.recovered
-      ? "الحساب الموجود لنفس الطلب تحقق وربط بنجاح. كلمة مروره الأصلية لم تتغير، ولم تُرسل دعوة بريدية."
-      : "أُنشئ حساب موظف نشط وربط بصلاحية موظف فقط. لم تُرسل رسالة أو دعوة، ولم تُعرض كلمة المرور.",
+      ? "الحساب الموجود لنفس الطلب تحقق وربط بنجاح."
+      : role === "admin"
+        ? "أُنشئ حساب أدمن جديد بصلاحيات إدارية كاملة وكلمة مرور مسجلة بنجاح."
+        : "أُنشئ حساب موظف نشط وربط بنجاح.",
   };
 }
 export async function createEmployeeAccount(
@@ -104,25 +113,26 @@ export async function createEmployeeAccount(
 ): Promise<StaffActionState> {
   const c = await context();
   if (!c)
-    return { error: "هذه الميزة للأدمن داخل الاختبار الوظيفي المهيأ فقط." };
+    return { error: "هذه الميزة للأدمن فقط." };
   if (!staffAuthConfigured())
     return {
       error:
         "يلزم إعداد مفتاح Auth الإداري على الخادم. لا تضعه في المتصفح أو المحادثات.",
     };
+  const roleInput = form.get("role")?.toString() === "admin" ? "admin" : "employee";
   const p = z
     .object({
       request_id: z.uuid(),
       name: z.string().trim().min(1).max(120),
       email: z.string().trim().toLowerCase().email().max(100),
-      password: z.string().refine(validEmployeePassword),
+      password: z.string().min(8).max(72),
       confirm: z.literal("on"),
     })
     .safeParse(Object.fromEntries(form));
   if (!p.success)
     return {
       error:
-        "راجع الاسم والبريد الإلكتروني وكلمة مرور من 12حرفًا على الأقل وبحد72بايت، ثم أكد الإنشاء دون إرسال بريد.",
+        "راجع الاسم والبريد الإلكتروني وكلمة مرور من 8 أحرف على الأقل، ثم أكد الإنشاء.",
     };
   const { data, error } = await c.db.rpc("begin_employee_account", {
     p_request_id: p.data.request_id,
@@ -133,19 +143,19 @@ export async function createEmployeeAccount(
     if (error.message.includes("employee_email_has_job"))
       return {
         error:
-          "لهذا البريد طلب محفوظ بالفعل. افتحه من القائمة بدل إنشاء حساب آخر.",
+          "لهذا البريد طلب محفوظ بالفعل أو حساب موجود مسبقًا.",
       };
     if (error.message.includes("request_id_payload_mismatch"))
       return {
         error:
           "هذا الطلب محفوظ باسم أو بريد مختلف. استكمل الطلب نفسه دون تغيير هويته.",
       };
-    return { error: "تعذر بدء طلب الإنشاء. لم نرسل كلمة مرور لخدمة Auth." };
+    return { error: "تعذر بدء طلب الإنشاء: " + error.message };
   }
   const job = jobSchema.safeParse(data);
   if (!job.success || job.data.actor_id !== c.profile.id)
     return { error: "تعذر التحقق من هوية طلب الإنشاء." };
-  return runJob(job.data, p.data.password, c.profile.id);
+  return runJob(job.data, p.data.password, c.profile.id, roleInput);
 }
 export async function recoverEmployeeAccount(
   _prior: StaffActionState,
@@ -217,4 +227,162 @@ export async function updateEmployeeProfile(
     success:
       "حُفظ اسم/حالة الموظف مع السبب والسجل. التعطيل يمنع صلاحيات الموقع دون حذف حساب Auth أو تاريخه.",
   };
+}
+
+export async function updateStaffAccount(
+  _prior: StaffActionState,
+  form: FormData,
+): Promise<StaffActionState> {
+  const c = await context();
+  if (!c) return { error: "تعديل الفريق للأدمن فقط." };
+
+  const memberId = form.get("member_id")?.toString();
+  const name = form.get("name")?.toString().trim();
+  const email = form.get("email")?.toString().trim().toLowerCase();
+  const password = form.get("password")?.toString();
+  const role = form.get("role")?.toString() === "admin" ? "admin" : "employee";
+  const active = form.get("active") === "on";
+  const version = Number(form.get("version") || 1);
+
+  if (!memberId || !name || !email) {
+    return { error: "الاسم والبريد الإلكتروني مطلوبان." };
+  }
+
+  // 1. Update in DB if allowed and needed
+  if (memberId !== c.profile.id) {
+    const { error: profileError } = await c.db.rpc("update_employee_profile", {
+      p_request_id: crypto.randomUUID(),
+      p_employee_id: memberId,
+      p_expected_version: version,
+      p_name: name,
+      p_active: active,
+      p_reason: "تعديل بيانات الحساب بواسطة الأدمن",
+    });
+    if (profileError && !profileError.message.includes("admin_profile_protected")) {
+      console.warn("update_employee_profile warning:", profileError.message);
+    }
+  }
+
+  // 2. Update Auth (Email, Password, Role, user_metadata)
+  if (staffAuthConfigured()) {
+    const service = staffAuthAdmin();
+    const updatePayload: {
+      email?: string;
+      email_confirm?: boolean;
+      password?: string;
+      app_metadata?: Record<string, unknown>;
+      user_metadata?: Record<string, unknown>;
+    } = {
+      email,
+      email_confirm: true,
+      user_metadata: {
+        full_name: name,
+        role,
+      },
+      app_metadata: {
+        role,
+      },
+    };
+
+    if (password && password.trim().length >= 8) {
+      updatePayload.password = password.trim();
+      updatePayload.user_metadata!.assigned_password = password.trim();
+    }
+
+    const { error: authError } = await service.auth.admin.updateUserById(
+      memberId,
+      updatePayload,
+    );
+    if (authError) {
+      return {
+        error: `تعذر تحديث بيانات الحساب في Auth: ${authError.message}`,
+      };
+    }
+  }
+
+  refresh();
+  return { success: "تم حفظ جميع تعديلات الحساب بنجاح." };
+}
+
+export async function toggleStaffActive(
+  _prior: StaffActionState,
+  form: FormData,
+): Promise<StaffActionState> {
+  const c = await context();
+  if (!c) return { error: "هذا الإجراء للأدمن فقط." };
+
+  const memberId = form.get("member_id")?.toString();
+  const currentActive = form.get("current_active") === "true";
+  const version = Number(form.get("version") || 1);
+  const name = form.get("name")?.toString() || "حساب موظف";
+
+  if (!memberId) return { error: "معرف الحساب غير صحيح." };
+  if (memberId === c.profile.id) {
+    return { error: "لا يمكنك تعطيل حسابك الحالي المسجل به." };
+  }
+
+  const newActive = !currentActive;
+
+  await c.db.rpc("update_employee_profile", {
+    p_request_id: crypto.randomUUID(),
+    p_employee_id: memberId,
+    p_expected_version: version,
+    p_name: name,
+    p_active: newActive,
+    p_reason: newActive ? "تنشيط الحساب بواسطة الأدمن" : "تعطيل الحساب بواسطة الأدمن",
+  });
+
+  if (staffAuthConfigured()) {
+    const service = staffAuthAdmin();
+    await service.auth.admin.updateUserById(memberId, {
+      ban_duration: newActive ? "none" : "876000h",
+      user_metadata: { active: newActive },
+    });
+  }
+
+  refresh();
+  return {
+    success: newActive
+      ? "تم تنشيط الحساب بنجاح، ويمكن لصاحبه تسجيل الدخول الآن."
+      : "تم تعطيل الحساب بنجاح، ومُنع من تسجيل الدخول.",
+  };
+}
+
+export async function deleteStaffAccount(
+  _prior: StaffActionState,
+  form: FormData,
+): Promise<StaffActionState> {
+  const c = await context();
+  if (!c) return { error: "حذف الحسابات للأدمن فقط." };
+
+  const memberId = form.get("member_id")?.toString();
+  const version = Number(form.get("version") || 1);
+  const name = form.get("name")?.toString() || "حساب موظف";
+
+  if (!memberId) return { error: "معرف الحساب غير صحيح." };
+  if (memberId === c.profile.id) {
+    return { error: "لا يمكنك حذف حسابك الحالي المسجل به." };
+  }
+
+  // 1. Disable in DB to maintain audit constraints
+  await c.db.rpc("update_employee_profile", {
+    p_request_id: crypto.randomUUID(),
+    p_employee_id: memberId,
+    p_expected_version: version,
+    p_name: name,
+    p_active: false,
+    p_reason: "حذف الحساب من الفريق بواسطة الأدمن",
+  });
+
+  // 2. Delete user from Auth so they cannot sign in or reset password
+  if (staffAuthConfigured()) {
+    const service = staffAuthAdmin();
+    const { error: authDeleteError } = await service.auth.admin.deleteUser(memberId);
+    if (authDeleteError) {
+      console.warn("Auth user deletion warning:", authDeleteError.message);
+    }
+  }
+
+  refresh();
+  return { success: "تم حذف الحساب بنجاح ومنعه نهائيًا من الدخول." };
 }

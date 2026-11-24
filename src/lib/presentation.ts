@@ -112,3 +112,25 @@ export function auditChanges(oldData: unknown, newData: unknown) {
       after: next[key],
     }));
 }
+
+export function displayCustomerName(
+  name: string | null | undefined,
+  fallback = "غير متاح",
+): string {
+  if (!name) return fallback;
+  const cleaned = name.replace(/^اختبار\s*/i, "").trim();
+  return cleaned || fallback;
+}
+
+export function displayCustomerPhone(
+  phone: string | null | undefined,
+  fallback = "—",
+): string {
+  if (!phone) return fallback;
+  let cleaned = phone.replace(/^TEST-?/i, "").trim();
+  if (/^20(1\d{9})$/.test(cleaned)) {
+    cleaned = `0${cleaned.slice(2)}`;
+  }
+  return cleaned || fallback;
+}
+

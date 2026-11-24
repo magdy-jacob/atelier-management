@@ -1,7 +1,7 @@
 "use client";
 import { ImageOrdering } from "./image-ordering";
 import { ImageCleanupJobs, type CleanupJob } from "./image-deletion";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useEffect, useRef } from "react";
 import { Archive, ImagePlus, Save, RotateCcw } from "lucide-react";
 import {
   editDress,
@@ -72,6 +72,15 @@ export function InventoryEditor({
     uploadDressImage,
     initial,
   );
+  const [selectedUploadCount, setSelectedUploadCount] = useState(0);
+  const uploadFormRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (imageState.success) {
+      uploadFormRef.current?.reset();
+      setSelectedUploadCount(0);
+    }
+  }, [imageState.success]);
   return (
     <div className="grid items-start gap-7 lg:grid-cols-[1.3fr_1fr]">
       <section className="studio-card p-6 md:p-8">
@@ -259,26 +268,43 @@ export function InventoryEditor({
         )}
         {!readOnly && (
           <form
+            ref={uploadFormRef}
             action={preview ? undefined : imageAction}
             onSubmit={preview ? (e) => e.preventDefault() : undefined}
             className="space-y-5"
           >
             <input type="hidden" name="id" value={dress.id} />
             <label className="field">
-              إضافة صورة
+              إضافة صور الفستان (يمكنك اختيار عدة صور معًا)
               <input
-                name="image"
-                aria-label="صورة الفستان"
+                name="images"
+                aria-label="صور الفستان"
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
+                multiple
                 required
                 disabled={preview}
+                onChange={(e) =>
+                  setSelectedUploadCount(e.target.files?.length ?? 0)
+                }
               />
             </label>
+            {selectedUploadCount > 0 && (
+              <p className="text-xs font-medium text-primary">
+                تم اختيار {selectedUploadCount}{" "}
+                {selectedUploadCount === 1
+                  ? "صورة"
+                  : selectedUploadCount === 2
+                    ? "صورتين"
+                    : "صور"}{" "}
+                للرفع.
+              </p>
+            )}
             <p className="text-[11px] leading-7 text-muted-foreground">
               صورة ثابتة JPEG أو PNG أو WebP، بحد أقصى ٥ ميجابايت و٤٠ مليون
-              بكسل. نحولها إلى WebP ونزيل بياناتها الوصفية قبل الرفع. هذه صور
-              كتالوج متاحة برابط مباشر، لا ترفع هوية أو بيانات شخصية.
+              بكسل لكل صورة. يمكنك تحديد أكثر من صورة معًا لرفعها دفعة واحدة.
+              نحولها إلى WebP ونزيل بياناتها الوصفية قبل الرفع. هذه صور كتالوج
+              متاحة برابط مباشر، لا ترفع هوية أو بيانات شخصية.
             </p>
             <Message state={imageState} />
             <Button
@@ -288,10 +314,12 @@ export function InventoryEditor({
             >
               <ImagePlus size={16} />
               {uploading
-                ? "جارٍ معالجة ورفع الصورة…"
+                ? "جارٍ معالجة ورفع الصور…"
                 : preview
                   ? "الرفع غير مفعل في المعاينة"
-                  : "رفع الصورة"}
+                  : selectedUploadCount > 1
+                    ? `رفع ${selectedUploadCount} صور`
+                    : "رفع الصور"}
             </Button>
             <p className="text-[10px] leading-6 text-muted-foreground">
               الصور الجديدة تُضاف في نهاية القائمة. يمكن حفظ ترتيبها وتغيير

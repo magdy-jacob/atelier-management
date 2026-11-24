@@ -40,7 +40,7 @@ export function Catalogue({ dresses }: { dresses: Dress[] }) {
           >
             A DRESS FOR EVERY STORY
           </div>
-          <h2 className="text-3xl font-medium">اختاري حكايتك</h2>
+          <h2 className="text-3xl font-medium">اختاري حكاsssيتك</h2>
         </div>
         <span className="text-xs text-muted-foreground">
           {filtered.length} تصاميم
